@@ -9,7 +9,7 @@ import styles from '../../styles/MarketPage.module.css';
 import { formatEther } from 'viem';
 import { useAccount, useReadContract, useWriteContract } from 'wagmi';
 import { parseEther } from 'viem';
-import { ERC20Abi } from '../../deployments/abis/ERC20'; // Changed from erc20Abi to ERC20Abi
+import { ERC20Abi } from '../../deployments/abis/ERC20';
 import { ViewHelper } from '../../deployments/abis/ViewHelper';
 import { UniHelper } from '../../deployments/abis/UniHelper';
 import addresses from '../../deployments/addresses';
@@ -47,7 +47,16 @@ const MarketPage: NextPage = () => {
   });
 
   // Approve contract
-  const { writeContractAsync, isPending: isApproving } = useWriteContract();
+  const { writeContractAsync, isPending } = useWriteContract({
+    mutation: {
+      onError: (error) => {
+        console.error('Contract write error:', error);
+      },
+      onSuccess: (data) => {
+        console.log('Contract write success:', data);
+      }
+    }
+  });
 
   // Check if approval is needed when amount changes
   useEffect(() => {
@@ -96,24 +105,59 @@ const MarketPage: NextPage = () => {
     const amount = outcome === 'YES' ? yesAmount : noAmount;
     if (!amount || !market?.id) return;
 
-    if (tradeType === 'buy') {
-      await handleBuyShares(market.id, outcome, amount);
-    } else {
-      // TODO: Implement sell shares functionality
-      console.log('Sell shares not implemented yet');
+    console.log('🎯 handleTrade called:', { outcome, amount, marketId: market.id });
+
+    try {
+      // Execute the swap using writeContractAsync
+      const hash = await executeSwap({
+        address: addresses.baseSepolia.marketMakerHook as `0x${string}`,
+        abi: IMarketMakerHookAbi,
+        functionName: 'executeSwap',
+        args: [
+          market.id as `0x${string}`,
+          outcome === 'YES', // zeroForOne - true for YES
+          tradeType === 'sell' 
+            ? -parseEther(amount) // Negative for sells
+            : parseEther(amount), // Positive for buys
+        ],
+        gas: BigInt(1000000)
+      });
+
+      console.log('Transaction hash:', hash);
+      alert('Transaction submitted! Please wait for confirmation.');
+      
+      console.log(`✅ ${tradeType} successful`);
+      alert(`Successfully ${tradeType}ed ${amount} ${outcome} shares!`);
+      
+      router.reload();
+    } catch (error) {
+      console.error(`❌ Error ${tradeType}ing shares:`, error);
+      alert(`Error: ${(error as Error).message}`);
     }
   };
 
   // Update the hook to use writeContractAsync
   const { writeContractAsync: executeSwap } = useWriteContract();
 
+  // Add this useEffect to monitor the address
+  useEffect(() => {
+    console.log('Current user address:', userAddress);
+  }, [userAddress]);
+
   const handleBuyShares = async (marketId: string, outcome: 'YES' | 'NO', amount: string) => {
+    console.log('handleBuyShares called with address:', userAddress);
     if (!market?.collateralToken || !userAddress) {
-      console.error('Missing market data or user not connected');
+      console.error('Missing market data or user not connected:', {
+        hasCollateralToken: !!market?.collateralToken,
+        hasUserAddress: !!userAddress
+      });
       return;
     }
 
     try {
+      console.log('Starting handleBuyShares...');
+      console.log('WriteContract instance:', !!executeSwap); // Check if the hook is defined
+      
       // Check if approval is needed
       if (needsApproval) {
         console.log('🔓 Need approval first');
@@ -133,9 +177,8 @@ const MarketPage: NextPage = () => {
           outcome === 'YES', // zeroForOne - true for YES
           parseEther(amount), // amountSpecified
         ],
+        gas: BigInt(1000000)
       });
-
-      
 
       console.log('Transaction hash:', hash);
       alert('Transaction submitted! Please wait for confirmation.');
@@ -245,6 +288,81 @@ const MarketPage: NextPage = () => {
     });
   }, [market?.id, tradeType, yesAmount, noAmount]);
 
+  // Add this near your other useReadContract hooks
+  const { data: collateralBalance } = useReadContract({
+    address: market?.collateralToken as `0x${string}`,
+    abi: ERC20Abi,
+    functionName: 'balanceOf',
+    args: userAddress ? [userAddress] : undefined
+  });
+
+  // Log the collateral balance whenever it changes
+  useEffect(() => {
+    if (collateralBalance !== undefined && collateralBalance !== null) {
+      console.log('Collateral Balance:', collateralBalance.toString());
+    }
+  }, [collateralBalance]);
+
+  // Update the formatCollateralBalance function to handle decimals
+  const formatCollateralBalance = (balance: bigint | undefined, decimals: number | undefined) => {
+    if (!balance) return '0';
+    const decimalPlaces = decimals || 18;
+    const formatted = formatEther(balance);
+    return Number(formatted).toFixed(decimalPlaces);
+  };
+
+  // Add these hooks to get token balances with error handling
+  const { data: yesTokenBalance, error: yesBalanceError } = useReadContract({
+    address: market?.yesTokenAddress as `0x${string}`,
+    abi: ERC20Abi,
+    functionName: 'balanceOf',
+    args: [userAddress ?? '0x0000000000000000000000000000000000000000'],
+  });
+
+  const { data: noTokenBalance, error: noBalanceError } = useReadContract({
+    address: market?.noTokenAddress as `0x${string}`,
+    abi: ERC20Abi,
+    functionName: 'balanceOf',
+    args: [userAddress ?? '0x0000000000000000000000000000000000000000'],
+  });
+
+  // Add error logging
+  useEffect(() => {
+    if (yesBalanceError) console.error('Yes token balance error:', yesBalanceError);
+    if (noBalanceError) console.error('No token balance error:', noBalanceError);
+  }, [yesBalanceError, noBalanceError]);
+
+  // Update the logging to show more details
+  useEffect(() => {
+    console.log('Token Balance Debug:', {
+      yesTokenAddress: market?.yesTokenAddress,
+      noTokenAddress: market?.noTokenAddress,
+      userAddress,
+      yesTokenBalance: yesTokenBalance?.toString(),
+      noTokenBalance: noTokenBalance?.toString(),
+      isYesBalanceUndefined: yesTokenBalance === undefined,
+      isNoBalanceUndefined: noTokenBalance === undefined
+    });
+  }, [market?.yesTokenAddress, market?.noTokenAddress, userAddress, yesTokenBalance, noTokenBalance]);
+
+  // Add this useEffect to log token addresses
+  useEffect(() => {
+    if (market) {
+      console.log('YES Token Address:', market.yesTokenAddress);
+      console.log('NO Token Address:', market.noTokenAddress);
+    }
+  }, [market]);
+
+  // Keep existing balance logging
+  useEffect(() => {
+    if (yesTokenBalance !== undefined && yesTokenBalance !== null) {
+      console.log('YES Token Balance:', formatEther(yesTokenBalance));
+    }
+    if (noTokenBalance !== undefined && noTokenBalance !== null) {
+      console.log('NO Token Balance:', formatEther(noTokenBalance));
+    }
+  }, [yesTokenBalance, noTokenBalance]);
+
   return (
     <Layout title={market?.question || 'Loading Market...'}>
       <div className={styles.marketPage}>
@@ -271,6 +389,8 @@ const MarketPage: NextPage = () => {
         <div className={styles.rightPanel}>
           <div className={styles.tradingContainer}>
             <h2>Trade Shares</h2>
+                        
+
             <div className={styles.tradeTypeSelector}>
               <button 
                 className={`${styles.tradeTypeButton} ${tradeType === 'buy' ? styles.active : ''}`}
@@ -294,15 +414,17 @@ const MarketPage: NextPage = () => {
                 <button
                   className={styles.approveButton}
                   onClick={handleApprove}
-                  disabled={isApproving}
+                  disabled={isPending}
                 >
-                  {isApproving ? 'Approving...' : 'Approve Collateral'}
+                  {isPending ? 'Approving...' : 'Approve Collateral'}
                 </button>
               </div>
             ) : (
               <div className={styles.tradingOptions}>
                 <div className={styles.option}>
-                  <span>YES</span>
+                  <div className={styles.optionHeader}>
+                    <span>YES</span>
+                  </div>
                   <input 
                     type="number" 
                     placeholder="Amount" 
@@ -318,7 +440,9 @@ const MarketPage: NextPage = () => {
                   </button>
                 </div>
                 <div className={styles.option}>
-                  <span>NO</span>
+                  <div className={styles.optionHeader}>
+                    <span>NO</span>
+                  </div>
                   <input 
                     type="number" 
                     placeholder="Amount" 
@@ -334,8 +458,16 @@ const MarketPage: NextPage = () => {
                   </button>
                 </div>
                 {(yesAmount || noAmount) && (
-                  <div className={styles.collateralNeeded}>
-                    Collateral needed: {collateralNeeded} ETH
+                  <div className={styles.collateralInfo}>
+                    <div className={styles.collateralNeeded}>
+                      Collateral needed: {collateralNeeded} USDC
+                    </div>
+                    <div className={styles.collateralBalance}>
+                      Available balance: {formatCollateralBalance(
+                        typeof collateralBalance === 'bigint' ? collateralBalance : undefined,
+                        Number(collateralDecimals)
+                      )} USDC
+                    </div>
                   </div>
                 )}
               </div>
@@ -347,11 +479,11 @@ const MarketPage: NextPage = () => {
             <div className={styles.shareDetails}>
               <div className={styles.shareRow}>
                 <span>YES Shares:</span>
-                <span>{formatTokenAmount(market?.yesShares, Number(yesTokenDecimals))}</span>
+                <span>{formatTokenAmount(yesTokenBalance, yesTokenDecimals)}</span>
               </div>
               <div className={styles.shareRow}>
                 <span>NO Shares:</span>
-                <span>{formatTokenAmount(market?.noShares, Number(noTokenDecimals))}</span>
+                <span>{formatTokenAmount(noTokenBalance, noTokenDecimals)}</span>
               </div>
             </div>
           </div>
