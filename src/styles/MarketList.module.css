@@ -1,0 +1,61 @@
+.marketList {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.marketList h2 {
+  margin-bottom: 1.5rem;
+  font-size: 1.75rem;
+}
+
+.noMarkets {
+  text-align: center;
+  padding: 2rem;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  color: #6c757d;
+}
+
+.markets {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.5rem;
+}
+
+.marketCard {
+  padding: 1.5rem;
+  border-radius: 8px;
+  background-color: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s, box-shadow 0.2s;
+  cursor: pointer;
+}
+
+.marketCard:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.marketCard h3 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  font-size: 1.25rem;
+  line-height: 1.4;
+}
+
+.marketInfo {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.probability, .endTime, .poolSize {
+  font-size: 0.875rem;
+  color: #495057;
+}
+
+.probability span, .endTime span, .poolSize span {
+  font-weight: 600;
+  color: #212529;
+} 

@@ -1,0 +1,138 @@
+.marketDetail {
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.marketDetail h2 {
+  margin-bottom: 1rem;
+  font-size: 2rem;
+}
+
+.description {
+  margin-bottom: 2rem;
+  font-size: 1.1rem;
+  color: #495057;
+  line-height: 1.6;
+}
+
+.marketStats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2.5rem;
+}
+
+.statCard {
+  padding: 1.5rem;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+.statCard h3 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  font-size: 1.25rem;
+  color: #212529;
+}
+
+.stat {
+  margin-bottom: 0.75rem;
+  font-size: 1rem;
+  color: #495057;
+}
+
+.stat span {
+  font-weight: 600;
+  color: #212529;
+  margin-right: 0.5rem;
+}
+
+.tradeSection {
+  padding: 2rem;
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.tradeSection h3 {
+  margin-top: 0;
+  margin-bottom: 1.5rem;
+  font-size: 1.5rem;
+}
+
+.tradeForm {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.outcomeSelector {
+  display: flex;
+  gap: 1rem;
+}
+
+.outcomeButton {
+  flex: 1;
+  padding: 0.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+  border: 2px solid #dee2e6;
+  border-radius: 6px;
+  background-color: #fff;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.outcomeButton.selected {
+  background-color: #0d76fc;
+  color: #fff;
+  border-color: #0d76fc;
+}
+
+.amountInput {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.amountInput label {
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.amountInput input {
+  padding: 0.75rem;
+  font-size: 1rem;
+  border: 1px solid #ced4da;
+  border-radius: 6px;
+}
+
+.buyButton {
+  padding: 0.875rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #fff;
+  background-color: #0d76fc;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.buyButton:hover:not(:disabled) {
+  background-color: #0a5dc7;
+}
+
+.buyButton:disabled {
+  background-color: #adb5bd;
+  cursor: not-allowed;
+}
+
+.connectWallet {
+  text-align: center;
+  color: #dc3545;
+  font-size: 0.875rem;
+  margin-top: 0.5rem;
+} 
