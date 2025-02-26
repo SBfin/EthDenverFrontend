@@ -1,7 +1,7 @@
 const addresses = {
     "baseSepolia": {
-        "marketMakerHook": "0x6D910b3e8773A7d3A081F39Ae52bD03C4273CA80",
-        "viewHelper": "0x82f850b02Db3b3Ff40eE74d7954D0DB88399B8e7",
+        "marketMakerHook": "0xc89dac7228874DD638747064166443Ea2Beb4A80",
+        "viewHelper": "0x8a17f0839ce7d5F3C2aE241BeC8c4B87c732da58",
     }
 }
 

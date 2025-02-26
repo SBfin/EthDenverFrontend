@@ -10,6 +10,9 @@ import { formatEther } from 'viem';
 import { useAccount, useReadContract, useWriteContract } from 'wagmi';
 import { parseEther } from 'viem';
 import { ERC20Abi } from '../../deployments/abis/ERC20'; // Changed from erc20Abi to ERC20Abi
+import { ViewHelper } from '../../deployments/abis/ViewHelper';
+import addresses from '../../deployments/addresses';
+import { IMarketMakerHookAbi } from '../../deployments/abis/IMarketMakerHook';
 
 const MarketPage: NextPage = () => {
   const router = useRouter();
@@ -32,6 +35,7 @@ const MarketPage: NextPage = () => {
   const [yesAmount, setYesAmount] = useState('');
   const [noAmount, setNoAmount] = useState('');
   const [needsApproval, setNeedsApproval] = useState(false);
+  const [collateralNeeded, setCollateralNeeded] = useState<string>('0');
 
   // Read allowance
   const { data: allowance } = useReadContract({
@@ -42,7 +46,7 @@ const MarketPage: NextPage = () => {
   });
 
   // Approve contract
-  const { writeContract, isPending: isApproving } = useWriteContract();
+  const { writeContractAsync, isPending: isApproving } = useWriteContract();
 
   // Check if approval is needed when amount changes
   useEffect(() => {
@@ -59,13 +63,13 @@ const MarketPage: NextPage = () => {
     
     try {
       console.log('🔓 Approving collateral token...');
-      writeContract({
+      const hash = await writeContractAsync({
         address: market.collateralToken as `0x${string}`,
         abi: ERC20Abi,
         functionName: 'approve',
         args: [market.hookAddress, parseEther('1000000')], // Approve a large amount
       });
-      console.log('✅ Approval initiated');
+      console.log('✅ Approval transaction hash:', hash);
     } catch (error) {
       console.error('❌ Error approving token:', error);
       alert(`Error: ${(error as Error).message}`);
@@ -99,11 +103,40 @@ const MarketPage: NextPage = () => {
     }
   };
 
+  // Update the hook to use writeContractAsync
+  const { writeContractAsync: executeSwap } = useWriteContract();
+
   const handleBuyShares = async (marketId: string, outcome: 'YES' | 'NO', amount: string) => {
-    console.log(`🛒 Attempting to buy ${amount} ${outcome} shares for market ${marketId}`);
-    
+    if (!market?.collateralToken || !userAddress) {
+      console.error('Missing market data or user not connected');
+      return;
+    }
+
     try {
-      await buyShares(marketId, outcome, amount);
+      // Check if approval is needed
+      if (needsApproval) {
+        console.log('🔓 Need approval first');
+        alert('Please approve the contract to spend your collateral tokens first');
+        return;
+      }
+
+      console.log(`🛒 Attempting to buy ${amount} ${outcome} shares for market ${marketId}`);
+      
+      // Execute the swap using writeContractAsync
+      const hash = await executeSwap({
+        address: addresses.baseSepolia.marketMakerHook as `0x${string}`,
+        abi: IMarketMakerHookAbi,
+        functionName: 'executeSwap',
+        args: [
+          marketId as `0x${string}`,
+          outcome === 'YES', // zeroForOne - true for YES
+          parseEther(amount), // amountSpecified
+        ],
+      });
+
+      console.log('Transaction hash:', hash);
+      alert('Transaction submitted! Please wait for confirmation.');
+      
       console.log('✅ Purchase successful');
       alert(`Successfully purchased ${amount} ${outcome} shares!`);
       
@@ -150,6 +183,60 @@ const MarketPage: NextPage = () => {
       return '0';
     }
   };
+
+  // Quote collateral needed for trade
+  const { data: quotedCollateral, error: quoteError } = useReadContract({
+    address: addresses.baseSepolia.viewHelper as `0x${string}`,
+    abi: ViewHelper,
+    functionName: 'quoteCollateral',
+    args: market?.id && (yesAmount || noAmount) ? [
+      market.id as `0x${string}`,
+      tradeType === 'buy',
+      parseEther(yesAmount || noAmount || '0')
+    ] : undefined
+  });
+
+  // Log contract call details
+  useEffect(() => {
+    console.log('ViewHelper contract address:', addresses.baseSepolia.viewHelper);
+    console.log('Quote contract call config:', {
+      hasMarketId: !!market?.id,
+      hasAmount: !!(yesAmount || noAmount),
+      args: market?.id && (yesAmount || noAmount) ? [
+        market.id,
+        tradeType === 'buy',
+        parseEther(yesAmount || noAmount || '0').toString()
+      ] : 'no args'
+    });
+    if (quoteError) {
+      console.error('Quote error:', quoteError);
+    }
+  }, [market?.id, yesAmount, noAmount, tradeType, quoteError]);
+
+  // Update collateral needed when quote changes
+  useEffect(() => {
+    console.log('Raw quoted collateral:', quotedCollateral);
+    if (quotedCollateral) {
+      const collateralAmount = formatEther(BigInt(Math.abs(Number(quotedCollateral))));
+      console.log('Formatted collateral amount:', collateralAmount);
+      setCollateralNeeded(collateralAmount);
+    }
+  }, [quotedCollateral]);
+
+  // Also log when amounts change
+  useEffect(() => {
+    console.log('Trade inputs changed:', {
+      marketId: market?.id,
+      tradeType,
+      yesAmount,
+      noAmount,
+      args: market?.id && (yesAmount || noAmount) ? [
+        market.id,
+        tradeType === 'buy',
+        parseEther(yesAmount || noAmount || '0').toString()
+      ] : 'no args'
+    });
+  }, [market?.id, tradeType, yesAmount, noAmount]);
 
   return (
     <Layout title={market?.question || 'Loading Market...'}>
@@ -239,6 +326,11 @@ const MarketPage: NextPage = () => {
                     {tradeType === 'buy' ? 'Buy NO' : 'Sell NO'}
                   </button>
                 </div>
+                {(yesAmount || noAmount) && (
+                  <div className={styles.collateralNeeded}>
+                    Collateral needed: {collateralNeeded} ETH
+                  </div>
+                )}
               </div>
             )}
           </div>

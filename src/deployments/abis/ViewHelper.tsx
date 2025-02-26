@@ -274,6 +274,79 @@ export const ViewHelper = [
         }
       ],
       "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "quoteCollateral",
+      "inputs": [
+        {
+          "name": "poolId",
+          "type": "bytes32",
+          "internalType": "PoolId"
+        },
+        {
+          "name": "zeroForOne",
+          "type": "bool",
+          "internalType": "bool"
+        },
+        {
+          "name": "desiredOutcomeTokens",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "int256",
+          "internalType": "int256"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "quoteCollateralNeededForTrade",
+      "inputs": [
+        {
+          "name": "poolId",
+          "type": "bytes32",
+          "internalType": "PoolId"
+        },
+        {
+          "name": "amountNew",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "amountOld",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "collateralAmount",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "collateralAddress",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "int256",
+          "internalType": "int256"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "error",
+      "name": "OutOfBounds",
+      "inputs": []
     }
   ] as const;
   
