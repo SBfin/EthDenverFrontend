@@ -38,9 +38,23 @@ const MarketPage: NextPage = () => {
   const [needsApproval, setNeedsApproval] = useState(false);
   const [collateralNeeded, setCollateralNeeded] = useState<string>('0');
 
-  // Read allowance
-  const { data: allowance } = useReadContract({
+  // Separate allowance checks for collateral and outcome tokens
+  const { data: collateralAllowance } = useReadContract({
     address: market?.collateralToken as `0x${string}`,
+    abi: ERC20Abi,
+    functionName: 'allowance',
+    args: userAddress && market?.hookAddress ? [userAddress, market.hookAddress] : undefined,
+  });
+
+  const { data: yesTokenAllowance } = useReadContract({
+    address: market?.yesTokenAddress as `0x${string}`,
+    abi: ERC20Abi,
+    functionName: 'allowance',
+    args: userAddress && market?.hookAddress ? [userAddress, market.hookAddress] : undefined,
+  });
+
+  const { data: noTokenAllowance } = useReadContract({
+    address: market?.noTokenAddress as `0x${string}`,
     abi: ERC20Abi,
     functionName: 'allowance',
     args: userAddress && market?.hookAddress ? [userAddress, market.hookAddress] : undefined,
@@ -58,26 +72,43 @@ const MarketPage: NextPage = () => {
     }
   });
 
-  // Check if approval is needed when amount changes
+  // Check if approval is needed based on trade type
   useEffect(() => {
-    if (!allowance || !market) return;
+    if (!market) return;
     
     const amount = parseEther(yesAmount || noAmount || '0');
-    // Ensure allowance is a bigint before comparison
-    const allowanceBigInt = typeof allowance === 'bigint' ? allowance : BigInt(0);
-    setNeedsApproval(amount > allowanceBigInt);
-  }, [allowance, yesAmount, noAmount, market]);
+    
+    if (tradeType === 'buy') {
+      // For buys, check collateral token allowance
+      const collateralAllowanceBigInt = typeof collateralAllowance === 'bigint' ? collateralAllowance : BigInt(0);
+      setNeedsApproval(amount > collateralAllowanceBigInt);
+    } else {
+      // For sells, check the relevant outcome token allowance
+      const tokenAllowance = yesAmount 
+        ? yesTokenAllowance 
+        : noTokenAllowance;
+      const tokenAllowanceBigInt = typeof tokenAllowance === 'bigint' ? tokenAllowance : BigInt(0);
+      setNeedsApproval(amount > tokenAllowanceBigInt);
+    }
+  }, [collateralAllowance, yesTokenAllowance, noTokenAllowance, yesAmount, noAmount, tradeType, market]);
 
+  // Modify handleApprove to handle both cases
   const handleApprove = async () => {
-    if (!market?.hookAddress || !market?.collateralToken) return;
+    if (!market?.hookAddress) return;
     
     try {
-      console.log('🔓 Approving collateral token...');
+      console.log('Approving token...');
+      const tokenToApprove = tradeType === 'buy' 
+        ? market.collateralToken
+        : yesAmount 
+          ? market.yesTokenAddress 
+          : market.noTokenAddress;
+
       const hash = await writeContractAsync({
-        address: market.collateralToken as `0x${string}`,
+        address: tokenToApprove as `0x${string}`,
         abi: ERC20Abi,
         functionName: 'approve',
-        args: [market.hookAddress, parseEther('1000000')], // Approve a large amount
+        args: [market.hookAddress as `0x${string}`, parseEther('1000000')],
       });
       console.log('✅ Approval transaction hash:', hash);
     } catch (error) {
@@ -120,19 +151,31 @@ const MarketPage: NextPage = () => {
             ? -parseEther(amount) // Negative for sells
             : parseEther(amount), // Positive for buys
         ],
-        gas: BigInt(1000000)
       });
 
-      console.log('Transaction hash:', hash);
+      console.log('Transaction submitted:', hash);
+      // log inputs
+      console.log('Inputs:', {
+        address: addresses.baseSepolia.marketMakerHook,
+        abi: IMarketMakerHookAbi,
+        functionName: 'executeSwap',
+        args: [market.id, outcome === 'YES', tradeType === 'sell' ? -parseEther(amount) : parseEther(amount)],
+        gas: BigInt(1000000)
+      });
       alert('Transaction submitted! Please wait for confirmation.');
       
-      console.log(`✅ ${tradeType} successful`);
-      alert(`Successfully ${tradeType}ed ${amount} ${outcome} shares!`);
+      // Don't show success message or reload until we confirm the transaction succeeded
+      // We should ideally wait for confirmation here
       
-      router.reload();
-    } catch (error) {
-      console.error(`❌ Error ${tradeType}ing shares:`, error);
-      alert(`Error: ${(error as Error).message}`);
+    } catch (error: any) {
+      console.error('Transaction failed:', error);
+      
+      // Extract revert reason if available
+      const revertReason = error.cause?.reason || error.message;
+      console.error('Revert reason:', revertReason);
+      
+      alert(`Transaction failed: ${revertReason}`);
+      return;
     }
   };
 
@@ -202,6 +245,11 @@ const MarketPage: NextPage = () => {
     functionName: 'decimals',
   });
 
+  // Log the decimals to check if they are fetched correctly
+  useEffect(() => {
+    console.log('Collateral Decimals:', collateralDecimals);
+  }, [collateralDecimals]);
+
   // Get decimals for YES token
   const { data: yesTokenDecimals } = useReadContract({
     address: market?.yesTokenAddress as `0x${string}`,
@@ -216,17 +264,14 @@ const MarketPage: NextPage = () => {
     functionName: 'decimals',
   });
 
-  const formatTokenAmount = (amount: string | number | undefined, decimals: number | undefined): string => {
-    if (!amount) return '0';
+  const formatTokenAmount = (amount: bigint | undefined, decimals: number | undefined): string => {
+    if (!amount) return '0.0000';
     try {
-      const value = typeof amount === 'string' ? amount : amount.toString();
-      const decimalPlaces = decimals || 18; // Default to 18 if decimals not available
-      const formattedValue = formatEther(parseEther(value));
-      // Show all decimal places up to the token's decimals
-      return Number(formattedValue).toFixed(decimalPlaces);
+      const formatted = formatEther(amount);
+      return Number(formatted).toFixed(4);
     } catch (error) {
       console.error('Error formatting token amount:', error);
-      return '0';
+      return '0.0000';
     }
   };
 
@@ -304,11 +349,12 @@ const MarketPage: NextPage = () => {
   }, [collateralBalance]);
 
   // Update the formatCollateralBalance function to handle decimals
-  const formatCollateralBalance = (balance: bigint | undefined, decimals: number | undefined) => {
-    if (!balance) return '0';
-    const decimalPlaces = decimals || 18;
-    const formatted = formatEther(balance);
-    return Number(formatted).toFixed(decimalPlaces);
+  const formatCollateralBalance = (balance: bigint | undefined, decimals: number | undefined): string => {
+    if (!balance || decimals === undefined) return '0.0000';
+    
+    // Convert balance to a string and format based on decimals
+    const formatted = (Number(balance) / Math.pow(10, decimals)).toFixed(decimals);
+    return formatted;
   };
 
   // Add these hooks to get token balances with error handling
@@ -363,6 +409,58 @@ const MarketPage: NextPage = () => {
     }
   }, [yesTokenBalance, noTokenBalance]);
 
+  // Add this effect to log all allowances
+  useEffect(() => {
+    console.log('Token Allowances:', {
+      collateral: {
+        token: market?.collateralToken,
+        spender: market?.hookAddress,
+        amount: collateralAllowance ? formatEther(collateralAllowance) : 'undefined',
+        raw: collateralAllowance?.toString()
+      },
+      yes: {
+        token: market?.yesTokenAddress,
+        spender: market?.hookAddress,
+        amount: yesTokenAllowance ? formatEther(yesTokenAllowance) : 'undefined',
+        raw: yesTokenAllowance?.toString()
+      },
+      no: {
+        token: market?.noTokenAddress,
+        spender: market?.hookAddress,
+        amount: noTokenAllowance ? formatEther(noTokenAllowance) : 'undefined',
+        raw: noTokenAllowance?.toString()
+      }
+    });
+  }, [
+    market?.collateralToken, 
+    market?.yesTokenAddress, 
+    market?.noTokenAddress, 
+    market?.hookAddress,
+    collateralAllowance,
+    yesTokenAllowance,
+    noTokenAllowance
+  ]);
+
+  const collateralBalanceFormatted = formatCollateralBalance(collateralBalance, collateralDecimals);
+
+  // Format the collateral needed based on decimals
+  const formatCollateralNeeded = (amount: string | number | undefined, decimals: number | undefined): string => {
+    if (amount === undefined || decimals === undefined) return '0.0000';
+
+    // Convert amount to a number and take absolute value
+    const absoluteAmount = Math.abs(Number(amount));
+    // Convert amount to a string and format based on decimals
+    const formatted = (absoluteAmount / Math.pow(10, decimals)).toFixed(4);
+    return formatted;
+  };
+
+  const formattedCollateralNeeded = formatCollateralNeeded(collateralNeeded, collateralDecimals);
+
+  // Log collateralNeeded to check its value
+  useEffect(() => {
+    console.log('Collateral Needed:', collateralNeeded);
+  }, [collateralNeeded]);
+
   return (
     <Layout title={market?.question || 'Loading Market...'}>
       <div className={styles.marketPage}>
@@ -406,17 +504,21 @@ const MarketPage: NextPage = () => {
               </button>
             </div>
             
-            {needsApproval && tradeType === 'buy' ? (
+            {needsApproval ? (
               <div className={styles.approvalContainer}>
                 <p className={styles.approvalMessage}>
-                  You need to approve the contract to spend your collateral tokens
+                  You need to approve the contract to spend your {
+                    tradeType === 'buy' ? 'collateral' : (yesAmount ? 'YES' : 'NO')
+                  } tokens
                 </p>
                 <button
                   className={styles.approveButton}
                   onClick={handleApprove}
                   disabled={isPending}
                 >
-                  {isPending ? 'Approving...' : 'Approve Collateral'}
+                  {isPending ? 'Approving...' : `Approve ${
+                    tradeType === 'buy' ? 'Collateral' : (yesAmount ? 'YES' : 'NO')
+                  } Token`}
                 </button>
               </div>
             ) : (
@@ -448,7 +550,8 @@ const MarketPage: NextPage = () => {
                     placeholder="Amount" 
                     value={noAmount}
                     onChange={(e) => setNoAmount(e.target.value)}
-                  />
+                  >
+                  </input>
                   <button 
                     className={styles.tradeButton}
                     onClick={() => handleTrade('NO')}
@@ -460,13 +563,13 @@ const MarketPage: NextPage = () => {
                 {(yesAmount || noAmount) && (
                   <div className={styles.collateralInfo}>
                     <div className={styles.collateralNeeded}>
-                      Collateral needed: {collateralNeeded} USDC
+                      {Number(collateralNeeded) >= 0 
+                        ? `Collateral needed: ${formatCollateralNeeded(collateralNeeded, collateralDecimals)} USDC`
+                        : `Collateral received: ${formatCollateralNeeded(collateralNeeded, collateralDecimals)} USDC`
+                      }
                     </div>
                     <div className={styles.collateralBalance}>
-                      Available balance: {formatCollateralBalance(
-                        typeof collateralBalance === 'bigint' ? collateralBalance : undefined,
-                        Number(collateralDecimals)
-                      )} USDC
+                      Available balance: {collateralBalanceFormatted} {market?.collateralTokenSymbol}
                     </div>
                   </div>
                 )}
@@ -479,11 +582,17 @@ const MarketPage: NextPage = () => {
             <div className={styles.shareDetails}>
               <div className={styles.shareRow}>
                 <span>YES Shares:</span>
-                <span>{formatTokenAmount(yesTokenBalance, yesTokenDecimals)}</span>
+                <span>{formatTokenAmount(
+                  typeof yesTokenBalance === 'bigint' ? yesTokenBalance : undefined,
+                  Number(yesTokenDecimals)
+                )}</span>
               </div>
               <div className={styles.shareRow}>
                 <span>NO Shares:</span>
-                <span>{formatTokenAmount(noTokenBalance, noTokenDecimals)}</span>
+                <span>{formatTokenAmount(
+                  typeof noTokenBalance === 'bigint' ? noTokenBalance : undefined,
+                  Number(noTokenDecimals)
+                )}</span>
               </div>
             </div>
           </div>
@@ -506,7 +615,7 @@ const MarketPage: NextPage = () => {
                 </div>
                 <div className={styles.detailRow}>
                   <span>Collateral Pool:</span>
-                  <span>{market?.collateralPoolSize} ETH</span>
+                  <span>{market?.collateralPoolSize} USDC</span>
                 </div>
                 <div className={styles.detailRow}>
                   <span>Status:</span>
