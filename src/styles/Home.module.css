@@ -100,3 +100,22 @@
     flex-direction: column;
   }
 }
+
+.error {
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  background-color: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+  border-radius: 4px;
+  text-align: center;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 300px;
+  font-size: 1.25rem;
+  color: #6c757d;
+}

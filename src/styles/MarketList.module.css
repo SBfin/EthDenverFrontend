@@ -58,4 +58,52 @@
 .probability span, .endTime span, .poolSize span {
   font-weight: 600;
   color: #212529;
+}
+
+.technicalDetails {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e9ecef;
+}
+
+.technicalDetails h4 {
+  margin-top: 0;
+  margin-bottom: 0.75rem;
+  font-size: 1rem;
+  color: #495057;
+}
+
+.detailRow {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+  font-size: 0.8125rem;
+  color: #6c757d;
+}
+
+.detailRow span {
+  font-weight: 600;
+  color: #495057;
+}
+
+.tokenValues {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+}
+
+.tokenValue {
+  font-size: 0.875rem;
+  color: #495057;
+  display: flex;
+  justify-content: space-between;
+}
+
+.tokenValue span {
+  font-weight: 600;
+  color: #212529;
 } 

@@ -12,4 +12,10 @@ export interface Market {
   probability: string;
   yesShares: string;
   noShares: string;
+  yesTokenAddress: string;
+  noTokenAddress: string;
+  currency0Address: string;
+  currency1Address: string;
+  hookAddress: string;
+  oracleAddress: string;
 } 

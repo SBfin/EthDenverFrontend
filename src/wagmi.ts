@@ -1,23 +1,20 @@
+import { http, createConfig } from 'wagmi';
+import { baseSepolia, localhost } from 'wagmi/chains';
 import { getDefaultConfig } from '@rainbow-me/rainbowkit';
-import {
-  arbitrum,
-  base,
-  mainnet,
-  optimism,
-  polygon,
-  sepolia,
-} from 'wagmi/chains';
+
+// Use localhost for development with anvil
+const localChain = {
+  ...localhost,
+  id: 31337,
+  name: 'Anvil',
+};
 
 export const config = getDefaultConfig({
-  appName: 'RainbowKit App',
-  projectId: 'YOUR_PROJECT_ID',
-  chains: [
-    mainnet,
-    polygon,
-    optimism,
-    arbitrum,
-    base,
-    ...(process.env.NEXT_PUBLIC_ENABLE_TESTNETS === 'true' ? [sepolia] : []),
-  ],
-  ssr: true,
+  appName: 'Prediction Market',
+  projectId: 'YOUR_PROJECT_ID', // Replace with your WalletConnect project ID if needed
+  chains: [baseSepolia, localChain],
+  transports: {
+    [baseSepolia.id]: http(),
+    [localChain.id]: http('http://localhost:8545'),
+  },
 });
