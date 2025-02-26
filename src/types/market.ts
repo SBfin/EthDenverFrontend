@@ -1,6 +1,7 @@
 export interface Market {
   id: string;
   question: string;
+  creator: string;
   description: string;
   endTime: number;
   resolved: boolean;

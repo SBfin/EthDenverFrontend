@@ -11,6 +11,7 @@ import { useAccount, useReadContract, useWriteContract } from 'wagmi';
 import { parseEther } from 'viem';
 import { ERC20Abi } from '../../deployments/abis/ERC20'; // Changed from erc20Abi to ERC20Abi
 import { ViewHelper } from '../../deployments/abis/ViewHelper';
+import { UniHelper } from '../../deployments/abis/UniHelper';
 import addresses from '../../deployments/addresses';
 import { IMarketMakerHookAbi } from '../../deployments/abis/IMarketMakerHook';
 
@@ -134,6 +135,8 @@ const MarketPage: NextPage = () => {
         ],
       });
 
+      
+
       console.log('Transaction hash:', hash);
       alert('Transaction submitted! Please wait for confirmation.');
       
@@ -188,12 +191,16 @@ const MarketPage: NextPage = () => {
   const { data: quotedCollateral, error: quoteError } = useReadContract({
     address: addresses.baseSepolia.viewHelper as `0x${string}`,
     abi: ViewHelper,
-    functionName: 'quoteCollateral',
-    args: market?.id && (yesAmount || noAmount) ? [
-      market.id as `0x${string}`,
-      tradeType === 'buy',
-      parseEther(yesAmount || noAmount || '0')
-    ] : undefined
+    functionName: 'quoteCollateralNeededForTrade',
+    args: [
+      market?.id as `0x${string}` ?? '0x0000000000000000000000000000000000000000000000000000000000000000',
+      tradeType === 'sell'
+        ? parseEther('100') + parseEther(yesAmount || noAmount || '0')
+        : parseEther('100') - parseEther(yesAmount || noAmount || '0'),
+      parseEther('100'), // amountOld (current supply)
+      parseEther(market?.collateralPoolSize || '0'), // collateralAmount
+      market?.collateralToken as `0x${string}` ?? '0x0000000000000000000000000000000000000000'
+    ],
   });
 
   // Log contract call details
@@ -217,7 +224,7 @@ const MarketPage: NextPage = () => {
   useEffect(() => {
     console.log('Raw quoted collateral:', quotedCollateral);
     if (quotedCollateral) {
-      const collateralAmount = formatEther(BigInt(Math.abs(Number(quotedCollateral))));
+      const collateralAmount = formatEther(BigInt(Number(quotedCollateral)));
       console.log('Formatted collateral amount:', collateralAmount);
       setCollateralNeeded(collateralAmount);
     }
