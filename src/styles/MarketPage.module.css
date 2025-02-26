@@ -40,4 +40,172 @@
   border: 1px solid #f5c6cb;
   border-radius: 4px;
   text-align: center;
+}
+
+.marketPage {
+  display: grid;
+  grid-template-columns: 1fr 400px;
+  gap: 2rem;
+  padding: 2rem;
+}
+
+.leftPanel, .rightPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.chartContainer,
+.transactionsContainer,
+.tradingContainer,
+.sharesContainer,
+.marketDetailsContainer {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.chartContainer {
+  min-height: 400px;
+}
+
+.tradeTypeSelector {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.tradeTypeButton {
+  flex: 1;
+  padding: 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: white;
+  cursor: pointer;
+}
+
+.tradeTypeButton.active {
+  background: #007bff;
+  color: white;
+  border-color: #0056b3;
+}
+
+.tradingOptions {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.option {
+  display: grid;
+  grid-template-columns: 80px 1fr auto;
+  gap: 1rem;
+  align-items: center;
+}
+
+.tradeButton {
+  padding: 0.5rem 1rem;
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.tradeButton:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.shareDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.shareRow {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 1rem;
+  align-items: center;
+}
+
+.marketDetails summary {
+  cursor: pointer;
+  padding: 0.5rem 0;
+}
+
+.detailsContent {
+  padding: 1rem 0;
+}
+
+.detailRow {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.transactionsList {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.transaction {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 1rem;
+  padding: 0.5rem;
+  border-bottom: 1px solid #eee;
+}
+
+.resolveButton, .claimButton {
+  width: 100%;
+  padding: 1rem;
+  background: #28a745;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.claimButton {
+  background: #ffc107;
+  color: #000;
+}
+
+.approvalContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+  background: #fff3cd;
+  border: 1px solid #ffeeba;
+  border-radius: 6px;
+  margin: 1rem 0;
+}
+
+.approvalMessage {
+  color: #856404;
+  margin: 0;
+  text-align: center;
+}
+
+.approveButton {
+  padding: 0.5rem 1rem;
+  background: #ffc107;
+  color: #000;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  width: 100%;
+}
+
+.approveButton:disabled {
+  background: #ffd54f;
+  cursor: not-allowed;
 } 
