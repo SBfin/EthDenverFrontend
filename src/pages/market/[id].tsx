@@ -7,17 +7,20 @@ import { useMarket } from '../../hooks/useMarkets';
 import { useMarketActions } from '../../hooks/useMarketActions';
 import styles from '../../styles/MarketPage.module.css';
 import { formatEther, formatUnits } from 'viem';
-import { useAccount, useReadContract, useWriteContract } from 'wagmi';
-import { parseEther } from 'viem';
+import { useAccount, useReadContract, useWriteContract, useChainId } from 'wagmi';
+import { parseEther, parseUnits } from 'viem';
 import { ERC20Abi } from '../../deployments/abis/ERC20';
 import { ViewHelper } from '../../deployments/abis/ViewHelper';
 import { UniHelper } from '../../deployments/abis/UniHelper';
 import addresses from '../../deployments/addresses';
 import { IMarketMakerHookAbi } from '../../deployments/abis/IMarketMakerHook';
+import { Market } from '../../types/market';
+import { useQuoteCollateral } from '../../hooks/useViewHelper';
 
 const MarketPage: NextPage = () => {
   const router = useRouter();
   const { id } = router.query;
+  const chainId = useChainId();
   const initialRender = useRef(true);
   const idRef = useRef(id);
   
@@ -38,26 +41,49 @@ const MarketPage: NextPage = () => {
   const [needsApproval, setNeedsApproval] = useState(false);
   const [collateralNeeded, setCollateralNeeded] = useState<string>('0');
 
-  // Separate allowance checks for collateral and outcome tokens
+  // Add this helper to get the correct hook address for the current chain
+  const getHookAddress = (chainId: number) => {
+    const contractAddresses = {
+      84532: addresses.baseSepolia.marketMakerHook,
+      1301: addresses.unichainSepolia.marketMakerHook
+    };
+
+    const address = contractAddresses[chainId as keyof typeof contractAddresses];
+    if (!address) {
+      throw new Error(`No hook address for chain ID ${chainId}`);
+    }
+    return address;
+  };
+
+  // Update the allowance checks to use the chain-specific hook address
   const { data: collateralAllowance } = useReadContract({
     address: market?.collateralToken as `0x${string}`,
     abi: ERC20Abi,
     functionName: 'allowance',
-    args: userAddress && market?.hookAddress ? [userAddress as `0x${string}`, market.hookAddress as `0x${string}`] : undefined,
+    args: userAddress ? [
+      userAddress as `0x${string}`, 
+      getHookAddress(chainId) as `0x${string}`
+    ] : undefined,
   });
 
   const { data: yesTokenAllowance } = useReadContract({
     address: market?.yesTokenAddress as `0x${string}`,
     abi: ERC20Abi,
     functionName: 'allowance',
-    args: userAddress && market?.hookAddress ? [userAddress as `0x${string}`, market.hookAddress as `0x${string}`] : undefined,
+    args: userAddress ? [
+      userAddress as `0x${string}`, 
+      getHookAddress(chainId) as `0x${string}`
+    ] : undefined,
   });
 
   const { data: noTokenAllowance } = useReadContract({
     address: market?.noTokenAddress as `0x${string}`,
     abi: ERC20Abi,
     functionName: 'allowance',
-    args: userAddress && market?.hookAddress ? [userAddress as `0x${string}`, market.hookAddress as `0x${string}`] : undefined,
+    args: userAddress ? [
+      userAddress as `0x${string}`, 
+      getHookAddress(chainId) as `0x${string}`
+    ] : undefined,
   });
 
   // Approve contract
@@ -72,47 +98,173 @@ const MarketPage: NextPage = () => {
     }
   });
 
-  // Check if approval is needed based on trade type
+  // Add this debug effect at the top level of your component
   useEffect(() => {
-    if (!market) return;
-    
-    const amount = parseEther(yesAmount || noAmount || '0');
-    
-    if (tradeType === 'buy') {
-      // For buys, check collateral token allowance
-      const collateralAllowanceBigInt = typeof collateralAllowance === 'bigint' ? collateralAllowance : BigInt(0);
-      setNeedsApproval(amount > collateralAllowanceBigInt);
-    } else {
-      // For sells, check the relevant outcome token allowance
-      const tokenAllowance = yesAmount 
-        ? yesTokenAllowance 
-        : noTokenAllowance;
-      const tokenAllowanceBigInt = typeof tokenAllowance === 'bigint' ? tokenAllowance : BigInt(0);
-      setNeedsApproval(amount > tokenAllowanceBigInt);
-    }
-  }, [collateralAllowance, yesTokenAllowance, noTokenAllowance, yesAmount, noAmount, tradeType, market]);
+    console.log('Debug Allowances:', {
+      tradeType,
+      amount: yesAmount || noAmount,
+      collateralAllowance: collateralAllowance ? formatUnits(collateralAllowance, 6) : 'undefined',
+      yesTokenAllowance: yesTokenAllowance ? formatEther(yesTokenAllowance) : 'undefined',
+      noTokenAllowance: noTokenAllowance ? formatEther(noTokenAllowance) : 'undefined',
+      hookAddress: market?.hookAddress,
+      tokenAddresses: {
+        collateral: market?.collateralToken,
+        yes: market?.yesTokenAddress,
+        no: market?.noTokenAddress
+      }
+    });
+  }, [
+    tradeType, 
+    yesAmount, 
+    noAmount, 
+    collateralAllowance, 
+    yesTokenAllowance, 
+    noTokenAllowance, 
+    market
+  ]);
 
-  // Modify handleApprove to handle both cases
-  const handleApprove = async () => {
-    if (!market?.hookAddress) return;
+  // Update the allowance check useEffect
+  useEffect(() => {
+    if (!market || !userAddress) {
+      console.log('Skipping approval check - no market or user');
+      return;
+    }
     
+    if (!yesAmount && !noAmount) {
+      console.log('Skipping approval check - no amount entered');
+      setNeedsApproval(false);
+      return;
+    }
+
     try {
-      console.log('Approving token...');
-      const tokenToApprove = tradeType === 'buy' 
+      if (tradeType === 'buy') {
+        // For buys, check collateral token allowance
+        const collateralAllowanceBigInt = typeof collateralAllowance === 'bigint' ? collateralAllowance : BigInt(0);
+        const amountToCheck = parseUnits(yesAmount || noAmount || '0', 6);
+        
+        // Debug log the exact values being compared
+        console.log('Buy Approval Check Details:', {
+          allowanceRaw: collateralAllowance?.toString(),
+          allowanceFormatted: formatUnits(collateralAllowanceBigInt, 6),
+          amountToCheckRaw: amountToCheck.toString(),
+          amountToCheckFormatted: formatUnits(amountToCheck, 6),
+          comparison: {
+            allowanceBigInt: collateralAllowanceBigInt.toString(),
+            amountBigInt: amountToCheck.toString(),
+            needsApproval: amountToCheck > collateralAllowanceBigInt
+          }
+        });
+        
+        setNeedsApproval(amountToCheck > collateralAllowanceBigInt);
+      } else {
+        // For sells, check the relevant outcome token allowance
+        const tokenAllowance = yesAmount ? yesTokenAllowance : noTokenAllowance;
+        const tokenAllowanceBigInt = typeof tokenAllowance === 'bigint' ? tokenAllowance : BigInt(0);
+        const amountToCheck = parseEther(yesAmount || noAmount || '0');
+        
+        // Debug log the exact values being compared
+        console.log('Sell Approval Check Details:', {
+          token: yesAmount ? 'YES' : 'NO',
+          allowanceRaw: tokenAllowance?.toString(),
+          allowanceFormatted: formatEther(tokenAllowanceBigInt),
+          amountToCheckRaw: amountToCheck.toString(),
+          amountToCheckFormatted: formatEther(amountToCheck),
+          comparison: {
+            allowanceBigInt: tokenAllowanceBigInt.toString(),
+            amountBigInt: amountToCheck.toString(),
+            needsApproval: amountToCheck > tokenAllowanceBigInt
+          }
+        });
+        
+        setNeedsApproval(amountToCheck > tokenAllowanceBigInt);
+      }
+    } catch (error) {
+      console.error('Error in approval check:', error);
+      setNeedsApproval(true);
+    }
+  }, [
+    collateralAllowance, 
+    yesTokenAllowance, 
+    noTokenAllowance, 
+    yesAmount, 
+    noAmount, 
+    tradeType, 
+    market,
+    userAddress
+  ]);
+
+  // Add this helper function at the top level
+  const getTokenToApprove = (
+    chainId: number,
+    market: Market | null,
+    tradeType: 'buy' | 'sell',
+    yesAmount: string,
+    noAmount: string
+  ) => {
+    const contractAddresses = {
+      84532: addresses.baseSepolia,
+      1301: addresses.unichainSepolia
+    };
+
+    const chainAddresses = contractAddresses[chainId as keyof typeof contractAddresses];
+    if (!chainAddresses || !market) {
+      throw new Error(`No addresses for chain ID ${chainId}`);
+    }
+
+    return {
+      token: tradeType === 'buy' 
         ? market.collateralToken
         : yesAmount 
           ? market.yesTokenAddress 
-          : market.noTokenAddress;
+          : market.noTokenAddress,
+      spender: chainAddresses.marketMakerHook
+    };
+  };
+
+  // Update handleApprove to include more logging
+  const handleApprove = async () => {
+    if (!market?.hookAddress) {
+      console.error('No hook address available');
+      return;
+    }
+    
+    try {
+      const { token: tokenToApprove, spender } = getTokenToApprove(
+        chainId,
+        market,
+        tradeType,
+        yesAmount,
+        noAmount
+      );
+
+      const approvalAmount = tradeType === 'buy'
+        ? parseUnits('1000000', 6)
+        : parseEther('1000000');
+
+      console.log('Approval Request:', {
+        token: tokenToApprove,
+        spender,
+        amount: tradeType === 'buy' 
+          ? formatUnits(approvalAmount, 6)
+          : formatEther(approvalAmount),
+        tradeType
+      });
 
       const hash = await writeContractAsync({
         address: tokenToApprove as `0x${string}`,
         abi: ERC20Abi,
         functionName: 'approve',
-        args: [market.hookAddress as `0x${string}`, parseEther('1000000')],
+        args: [spender as `0x${string}`, approvalAmount],
       });
-      console.log('✅ Approval transaction hash:', hash);
+
+      console.log('Approval Transaction:', {
+        hash,
+        token: tokenToApprove,
+        spender,
+        amount: approvalAmount.toString()
+      });
     } catch (error) {
-      console.error('❌ Error approving token:', error);
+      console.error('Approval Error:', error);
       alert(`Error: ${(error as Error).message}`);
     }
   };
@@ -139,9 +291,20 @@ const MarketPage: NextPage = () => {
     console.log('🎯 handleTrade called:', { outcome, amount, marketId: market.id });
 
     try {
+      // Get the correct contract address based on chain
+      const contractAddresses = {
+        84532: addresses.baseSepolia.marketMakerHook,
+        1301: addresses.unichainSepolia.marketMakerHook
+      };
+
+      const hookAddress = contractAddresses[chainId as keyof typeof contractAddresses];
+      if (!hookAddress) {
+        throw new Error(`No hook address for chain ID ${chainId}`);
+      }
+
       // Execute the swap using writeContractAsync
       const hash = await executeSwap({
-        address: addresses.baseSepolia.marketMakerHook as `0x${string}`,
+        address: hookAddress as `0x${string}`,
         abi: IMarketMakerHookAbi,
         functionName: 'executeSwap',
         args: [
@@ -154,28 +317,13 @@ const MarketPage: NextPage = () => {
       });
 
       console.log('Transaction submitted:', hash);
-      // log inputs
-      console.log('Inputs:', {
-        address: addresses.baseSepolia.marketMakerHook,
-        abi: IMarketMakerHookAbi,
-        functionName: 'executeSwap',
-        args: [market.id, outcome === 'YES', tradeType === 'sell' ? -parseEther(amount) : parseEther(amount)],
-        gas: BigInt(1000000)
-      });
       alert('Transaction submitted! Please wait for confirmation.');
-      
-      // Don't show success message or reload until we confirm the transaction succeeded
-      // We should ideally wait for confirmation here
       
     } catch (error: any) {
       console.error('Transaction failed:', error);
-      
-      // Extract revert reason if available
       const revertReason = error.cause?.reason || error.message;
       console.error('Revert reason:', revertReason);
-      
       alert(`Transaction failed: ${revertReason}`);
-      return;
     }
   };
 
@@ -276,48 +424,30 @@ const MarketPage: NextPage = () => {
   };
 
   // Quote collateral needed for trade
-  const { data: quotedCollateral, error: quoteError } = useReadContract({
-    address: addresses.baseSepolia.viewHelper as `0x${string}`,
-    abi: ViewHelper,
-    functionName: 'quoteCollateralNeededForTrade',
-    args: [
-      market?.id as `0x${string}` ?? '0x0000000000000000000000000000000000000000000000000000000000000000',
-      tradeType === 'sell'
-        ? parseEther('100') + parseEther(yesAmount || noAmount || '0')
-        : parseEther('100') - parseEther(yesAmount || noAmount || '0'),
-      parseEther('100'), // amountOld (current supply)
-      parseEther(market?.collateralPoolSize || '0'), // collateralAmount
-      market?.collateralToken as `0x${string}` ?? '0x0000000000000000000000000000000000000000'
-    ],
-  });
+  const { getQuote } = useQuoteCollateral();
 
-  // Log contract call details
-  useEffect(() => {
-    console.log('ViewHelper contract address:', addresses.baseSepolia.viewHelper);
-    console.log('Quote contract call config:', {
-      hasMarketId: !!market?.id,
-      hasAmount: !!(yesAmount || noAmount),
-      args: market?.id && (yesAmount || noAmount) ? [
+  const handleQuote = async (outcome: 'YES' | 'NO', amount: string) => {
+    if (!market?.id || !amount) return;
+
+    try {
+      const amountBigInt = parseEther(amount);
+      const quotedCollateral = await getQuote(
         market.id,
-        tradeType === 'buy',
-        parseEther(yesAmount || noAmount || '0').toString()
-      ] : 'no args'
-    });
-    if (quoteError) {
-      console.error('Quote error:', quoteError);
-    }
-  }, [market?.id, yesAmount, noAmount, tradeType, quoteError]);
+        amountBigInt,
+        BigInt(100), // amountOld - 0 for new trades
+        BigInt(100), // current collateral amount
+        market.collateralToken
+      );
 
-  // Update collateral needed when quote changes
-  useEffect(() => {
-    console.log('Raw quoted collateral:', quotedCollateral);
-    if (quotedCollateral) {
-      // Format based on 6 decimals for USDC instead of 18 (ether)
-      const collateralAmount = (Number(quotedCollateral) / 1e6).toFixed(4);
-      console.log('Formatted collateral amount:', collateralAmount);
-      setCollateralNeeded(collateralAmount);
+      if (quotedCollateral) {
+        // Format based on 6 decimals for USDC
+        const formattedQuote = formatUnits(quotedCollateral, 6);
+        setCollateralNeeded(formattedQuote);
+      }
+    } catch (err) {
+      console.error('Error getting quote:', err);
     }
-  }, [quotedCollateral]);
+  };
 
   // Also log when amounts change
   useEffect(() => {
@@ -364,6 +494,7 @@ const MarketPage: NextPage = () => {
     abi: ERC20Abi,
     functionName: 'balanceOf',
     args: [userAddress ?? '0x0000000000000000000000000000000000000000'],
+    chainId, // Explicitly specify the chain ID
   });
 
   const { data: noTokenBalance, error: noBalanceError } = useReadContract({
@@ -371,26 +502,22 @@ const MarketPage: NextPage = () => {
     abi: ERC20Abi,
     functionName: 'balanceOf',
     args: [userAddress ?? '0x0000000000000000000000000000000000000000'],
+    chainId, // Explicitly specify the chain ID
   });
 
-  // Add error logging
-  useEffect(() => {
-    if (yesBalanceError) console.error('Yes token balance error:', yesBalanceError);
-    if (noBalanceError) console.error('No token balance error:', noBalanceError);
-  }, [yesBalanceError, noBalanceError]);
-
-  // Update the logging to show more details
+  // Add debug logging
   useEffect(() => {
     console.log('Token Balance Debug:', {
+      chainId,
       yesTokenAddress: market?.yesTokenAddress,
       noTokenAddress: market?.noTokenAddress,
       userAddress,
-      yesTokenBalance: yesTokenBalance?.toString(),
-      noTokenBalance: noTokenBalance?.toString(),
-      isYesBalanceUndefined: yesTokenBalance === undefined,
-      isNoBalanceUndefined: noTokenBalance === undefined
+      yesBalance: yesTokenBalance?.toString(),
+      noBalance: noTokenBalance?.toString(),
+      yesError: yesBalanceError,
+      noError: noBalanceError
     });
-  }, [market?.yesTokenAddress, market?.noTokenAddress, userAddress, yesTokenBalance, noTokenBalance]);
+  }, [chainId, market, userAddress, yesTokenBalance, noTokenBalance, yesBalanceError, noBalanceError]);
 
   // Add this useEffect to log token addresses
   useEffect(() => {
@@ -527,7 +654,10 @@ const MarketPage: NextPage = () => {
                     type="number" 
                     placeholder="Amount" 
                     value={yesAmount}
-                    onChange={(e) => setYesAmount(e.target.value)}
+                    onChange={(e) => {
+                      setYesAmount(e.target.value);
+                      handleQuote('YES', e.target.value);
+                    }}
                   />
                   <button 
                     className={styles.tradeButton}

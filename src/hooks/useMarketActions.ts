@@ -1,52 +1,64 @@
 import { useState } from 'react';
-import { useWriteContract, useAccount } from 'wagmi';
+import { useWriteContract, useAccount, useChainId } from 'wagmi';
 import { IMarketMakerHookAbi } from '../deployments/abis/IMarketMakerHook';
 import addresses from '../deployments/addresses';
 import { parseEther } from 'viem';
 
 // Get the contract address based on the current chain
-const getContractAddress = () => {
-  // For local development with anvil, use this address
-  return addresses.baseSepolia.marketMakerHook;
+const getContractAddress = (chainId: number) => {
+  const contractAddresses = {
+    // Base Sepolia
+    84532: addresses.baseSepolia.marketMakerHook,
+    // Unichain Sepolia
+    1301: addresses.unichainSepolia.marketMakerHook
+  };
+
+  const address = contractAddresses[chainId as keyof typeof contractAddresses];
+  if (!address) {
+    throw new Error(`No contract address for chain ID ${chainId}`);
+  }
+
+  console.log(`Using contract address for chain ${chainId}:`, address);
+  return address;
 };
 
 export const useMarketActions = () => {
   const { address } = useAccount();
+  const chainId = useChainId();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   
   const { writeContractAsync } = useWriteContract();
 
-  const buyShares = async (marketId: string, outcome: 'YES' | 'NO', amount: string) => {
-    console.log(`🛒 Buying ${amount} ${outcome} shares for market ${marketId}`);
-    
-    if (!address) {
-      throw new Error('Wallet not connected');
-    }
+  const executeSwap = async (
+    marketId: string,
+    outcome: 'YES' | 'NO',
+    amount: string,
+    tradeType: 'buy' | 'sell'
+  ) => {
+    if (!address) throw new Error('Wallet not connected');
 
     setIsLoading(true);
     setError(null);
 
     try {
-      // The zeroForOne parameter determines if we're buying YES or NO tokens
-      // true for YES, false for NO (this might be reversed depending on your contract implementation)
+      const contractAddress = getContractAddress(chainId);
       const zeroForOne = outcome === 'YES';
+      const amountBigInt = tradeType === 'sell' 
+        ? -parseEther(amount) 
+        : parseEther(amount);
       
-      // Convert amount to the appropriate format
-      const amountBigInt = parseEther(amount);
-      
-      // Call the executeSwap function
       const tx = await writeContractAsync({
-        address: getContractAddress() as `0x${string}`,
+        address: contractAddress as `0x${string}`,
         abi: IMarketMakerHookAbi,
         functionName: 'executeSwap',
         args: [marketId as `0x${string}`, zeroForOne, amountBigInt],
       });
 
-      console.log('✅ Transaction submitted:', tx);
+      console.log('✅ Swap transaction submitted:', tx);
       return tx;
     } catch (err) {
-      console.error('❌ Error buying shares:', err);
+      console.error('❌ Error executing swap:', err);
       setError(err as Error);
       throw err;
     } finally {
@@ -55,18 +67,16 @@ export const useMarketActions = () => {
   };
 
   const claimWinnings = async (marketId: string) => {
-    console.log(`💰 Claiming winnings for market ${marketId}`);
-    
-    if (!address) {
-      throw new Error('Wallet not connected');
-    }
+    if (!address) throw new Error('Wallet not connected');
 
     setIsLoading(true);
     setError(null);
 
     try {
+      const contractAddress = getContractAddress(chainId);
+      
       const tx = await writeContractAsync({
-        address: getContractAddress() as `0x${string}`,
+        address: contractAddress as `0x${string}`,
         abi: IMarketMakerHookAbi,
         functionName: 'claimWinnings',
         args: [marketId as `0x${string}`],
@@ -84,7 +94,7 @@ export const useMarketActions = () => {
   };
 
   return {
-    buyShares,
+    executeSwap,
     claimWinnings,
     isLoading,
     error,

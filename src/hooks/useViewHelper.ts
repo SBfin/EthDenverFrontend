@@ -1,22 +1,37 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useReadContract } from 'wagmi';
+import { useReadContract, useChainId } from 'wagmi';
 import { ViewHelper } from '../deployments/abis/ViewHelper';
-import { erc20Abi } from '../deployments/abis/ERC20';
+import { ERC20Abi } from '../deployments/abis/ERC20';
 import addresses from '../deployments/addresses';
 import { formatUnits } from 'viem';
 
-// Get the ViewHelper contract address
-const getViewHelperAddress = () => {
-  return addresses.baseSepolia.viewHelper;
+const getContractAddress = (chainId: number) => {
+  // For local development with anvil, use this address
+  // In a real app, you would determine this based on the connected chain
+  const addressSepoliaBase = addresses.baseSepolia.marketMakerHook;
+  // TODO: add unichainSepolia.marketMakerHook
+  const addressSepoliaUnichain = addresses.unichainSepolia.marketMakerHook;
+  console.log('chainId', chainId);
+  return chainId === 84532 ? addressSepoliaBase : addressSepoliaUnichain;
+};
+
+// Pure function to get ViewHelper address - no hooks
+const getViewHelperAddress = (chainId: number) => {
+  const contractAddresses = {
+    84532: addresses.baseSepolia.viewHelper,
+    1301: addresses.unichainSepolia.viewHelper
+  };
+  return contractAddresses[chainId as keyof typeof contractAddresses];
 };
 
 // Helper function to get token decimals
 const useTokenDecimals = (tokenAddress: string | undefined) => {
-  const [decimals, setDecimals] = useState<number>(18); // Default to 18 decimals (like ETH)
+  const chainId = useChainId();
+  const [decimals, setDecimals] = useState<number>(18);
   
   const { data, isLoading, error } = useReadContract({
     address: tokenAddress as `0x${string}`,
-    abi: erc20Abi,
+    abi: ERC20Abi,
     functionName: 'decimals',
   });
   
@@ -41,6 +56,8 @@ export const useTokenValues = (
   noTokenAddress: string | undefined,
   collateralAddress: string | undefined
 ) => {
+  const chainId = useChainId();
+  const viewHelperAddress = getViewHelperAddress(chainId);
   const [values, setValues] = useState({
     yesValue: '0',
     noValue: '0',
@@ -84,7 +101,7 @@ export const useTokenValues = (
 
   // Get market data
   const { data: marketData, isLoading: isLoadingMarket } = useReadContract({
-    address: getViewHelperAddress() as `0x${string}`,
+    address: viewHelperAddress as `0x${string}`,
     abi: ViewHelper,
     functionName: 'getMarket',
     args: formattedPoolId ? [formattedPoolId] : undefined,
@@ -92,7 +109,7 @@ export const useTokenValues = (
 
   // Get token supplies
   const { data: tokenSupplies, isLoading: isLoadingSupplies } = useReadContract({
-    address: getViewHelperAddress() as `0x${string}`,
+    address: viewHelperAddress as `0x${string}`,
     abi: ViewHelper,
     functionName: 'getTokenSupplies',
     args: formattedPoolId ? [formattedPoolId] : undefined,
@@ -100,7 +117,7 @@ export const useTokenValues = (
 
   // Try the direct getTokenValues call (this might fail)
   const { data, isLoading, error } = useReadContract({
-    address: getViewHelperAddress() as `0x${string}`,
+    address: viewHelperAddress as `0x${string}`,
     abi: ViewHelper,
     functionName: 'getTokenValues',
     args: formattedPoolId ? [formattedPoolId] : undefined,
@@ -191,7 +208,7 @@ export const useTokenValues = (
   console.log(`🔄 Using raw poolId without formatting: ${rawPoolId}`);
 
   const { data: testData, error: testError } = useReadContract({
-    address: getViewHelperAddress() as `0x${string}`,
+    address: viewHelperAddress as `0x${string}`,
     abi: ViewHelper,
     functionName: 'getTokenValues',
     args: [rawPoolId]});
@@ -230,6 +247,8 @@ export const useTokenSupplies = (
   yesTokenAddress: string | undefined,
   noTokenAddress: string | undefined
 ) => {
+  const chainId = useChainId();
+  const viewHelperAddress = getViewHelperAddress(chainId);
   const [supplies, setSupplies] = useState({
     yesSupply: '0',
     noSupply: '0',
@@ -242,7 +261,7 @@ export const useTokenSupplies = (
   const noDecimals = useTokenDecimals(noTokenAddress);
 
   const { data, isLoading, error } = useReadContract({
-    address: getViewHelperAddress() as `0x${string}`,
+    address: viewHelperAddress as `0x${string}`,
     abi: ViewHelper,
     functionName: 'getTokenSupplies',
     args: poolId ? [poolId as `0x${string}`] : undefined,
@@ -280,6 +299,8 @@ export const useCollateralAmount = (
   poolId: string | undefined,
   collateralAddress: string | undefined
 ) => {
+  const chainId = useChainId();
+  const viewHelperAddress = getViewHelperAddress(chainId);
   const [collateralAmount, setCollateralAmount] = useState({
     amount: '0',
     isLoading: true,
@@ -290,7 +311,7 @@ export const useCollateralAmount = (
   const collateralDecimals = useTokenDecimals(collateralAddress);
 
   const { data, isLoading, error } = useReadContract({
-    address: getViewHelperAddress() as `0x${string}`,
+    address: viewHelperAddress as `0x${string}`,
     abi: ViewHelper,
     functionName: 'getMarket',
     args: poolId ? [poolId as `0x${string}`] : undefined,
@@ -319,4 +340,46 @@ export const useCollateralAmount = (
   }, [poolId, data, isLoading, error, collateralDecimals]);
 
   return collateralAmount;
+};
+
+// Add a new hook for quoting collateral
+export const useQuoteCollateral = () => {
+  const chainId = useChainId();
+  const viewHelperAddress = getViewHelperAddress(chainId);
+
+  const { data: quotedCollateral, refetch } = useReadContract({
+    address: viewHelperAddress as `0x${string}`,
+    abi: ViewHelper,
+    functionName: 'quoteCollateralNeededForTrade',
+    args: undefined, // We'll set this when calling refetch
+  });
+
+  const getQuote = async (
+    poolId: string | undefined,
+    amountNew: bigint,
+    amountOld: bigint,
+    collateralAmount: bigint,
+    collateralAddress: string | undefined
+  ) => {
+    if (!poolId || !collateralAddress) return null;
+
+    try {
+      const result = await refetch({
+        args: [
+          poolId as `0x${string}`,
+          amountNew,
+          amountOld,
+          collateralAmount,
+          collateralAddress as `0x${string}`
+        ]
+      });
+
+      return result.data;
+    } catch (err) {
+      console.error('Error getting quote:', err);
+      return null;
+    }
+  };
+
+  return { getQuote, quotedCollateral };
 }; 

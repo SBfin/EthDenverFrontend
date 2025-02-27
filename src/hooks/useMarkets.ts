@@ -1,20 +1,27 @@
 import { useState, useEffect, useRef } from 'react';
-import { useReadContract, useReadContracts, useAccount } from 'wagmi';
+import { useReadContract, useReadContracts, useAccount, useChainId } from 'wagmi';
 import { IMarketMakerHookAbi } from '../deployments/abis/IMarketMakerHook';
+import { ViewHelper } from '../deployments/abis/ViewHelper';
 import addresses from '../deployments/addresses';
 import { Market } from '../types/market';
 import { formatEther } from 'viem';
 
-// Get the contract address based on the current chain
-const getContractAddress = () => {
+// Get the contract address based on the current chain by chainId
+const getContractAddress = (chainId: number) => {
   // For local development with anvil, use this address
   // In a real app, you would determine this based on the connected chain
-  const address = addresses.baseSepolia.marketMakerHook;
-  return address;
+  const addressSepoliaBase = addresses.baseSepolia.marketMakerHook;
+  // TODO: add unichainSepolia.marketMakerHook
+  const addressSepoliaUnichain = addresses.unichainSepolia.marketMakerHook;
+  console.log('chainId', chainId);
+  return chainId === 84532 ? addressSepoliaBase : addressSepoliaUnichain;
 };
 
 export const useMarketCount = () => {
-  const contractAddress = getContractAddress() as `0x${string}`;
+  const chainId = useChainId();
+  
+  const contractAddress = getContractAddress(chainId) as `0x${string}`;
+  console.log('contractAddress for marketCount', contractAddress);
   
   // Add a state to handle the case when the hook is called before the provider is ready
   const [count, setCount] = useState<number>(0);
@@ -46,8 +53,9 @@ export const useMarketCount = () => {
 };
 
 export const useMarketPoolIds = (count: number) => {
-  const contractAddress = getContractAddress() as `0x${string}`;
-  
+  const chainId = useChainId();
+  const contractAddress = getContractAddress(chainId) as `0x${string}`;
+
   const calls = Array.from({ length: count }, (_, i) => ({
     address: contractAddress,
     abi: IMarketMakerHookAbi,
@@ -88,7 +96,8 @@ export const useMarketPoolIds = (count: number) => {
 };
 
 export const useMarketDetails = (poolIds: string[]) => {
-  const contractAddress = getContractAddress() as `0x${string}`;
+  const chainId = useChainId();
+  const contractAddress = getContractAddress(chainId) as `0x${string}`;
   
   // Only log when poolIds change
   useEffect(() => {
@@ -169,13 +178,42 @@ export const useMarketDetails = (poolIds: string[]) => {
 };
 
 export const useAllMarkets = () => {
+  const chainId = useChainId();
+  
+  // Log current chain for debugging
+  console.log('Current chain:', {
+    id: chainId
+  });
+
+  // Get the correct contract addresses based on chain
+  const contractAddresses = {
+    // Base Sepolia
+    84532: {
+      viewHelper: addresses.baseSepolia.viewHelper,
+      // other addresses...
+    },
+    // Unichain Sepolia
+    1301: {
+      viewHelper: addresses.unichainSepolia.viewHelper,
+      // other addresses...
+    }
+  };
+
+  const currentChainAddresses = contractAddresses[chainId as keyof typeof contractAddresses];
+
+  const { data: marketsData, isLoading, error: marketsError } = useReadContract({
+    address: currentChainAddresses?.viewHelper as `0x${string}`,
+    abi: ViewHelper,
+    functionName: 'getMarkets',
+  });
+
   const [markets, setMarkets] = useState<Market[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingState, setIsLoadingState] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const hasSetError = useRef(false);
   const hasSetMarkets = useRef(false);
 
-  const { marketCount, isLoading: isLoadingCount, error: countError } = useMarketCount();  
+  const { marketCount, isLoading: isLoadingMarketsCount, error: countError } = useMarketCount();  
   const { poolIds, isLoading: isLoadingIds, error: idsError } = useMarketPoolIds(marketCount);
   const { marketDetails, isLoading: isLoadingDetails, error: detailsError } = useMarketDetails(poolIds);
 
@@ -185,7 +223,6 @@ export const useAllMarkets = () => {
     if (!hasSetError.current) {
       if (countError) {
         console.error('❌ Market count error:', countError);
-        setError(countError as Error);
         hasSetError.current = true;
         return;
       }
@@ -204,18 +241,18 @@ export const useAllMarkets = () => {
     }
     
     // Log when loading completes and update state only once
-    if (!isLoadingCount && !isLoadingIds && !isLoadingDetails && !hasSetMarkets.current) {
+    if (!isLoadingMarketsCount && !isLoadingIds && !isLoadingDetails && !hasSetMarkets.current) {
       if (marketDetails && marketDetails.length > 0) {
         console.log(`✅ Loaded ${marketDetails.length} markets successfully`);
         setMarkets(marketDetails);
       } else if (!countError && !idsError && !detailsError) {
         console.log('ℹ️ No markets found');
       }
-      setIsLoading(false);
+      setIsLoadingState(false);
       hasSetMarkets.current = true;
     }
   }, [
-    isLoadingCount, isLoadingIds, isLoadingDetails, 
+    isLoadingMarketsCount, isLoadingIds, isLoadingDetails, 
     countError, idsError, detailsError, 
     marketDetails
   ]);
@@ -226,7 +263,7 @@ export const useAllMarkets = () => {
     hasSetMarkets.current = false;
   }, [marketCount, poolIds.length]);
 
-  return { markets, isLoading, error };
+  return { markets, isLoading: isLoadingState, error };
 };
 
 export const useMarket = (id: string | undefined) => {
@@ -234,7 +271,8 @@ export const useMarket = (id: string | undefined) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
-  const contractAddress = getContractAddress() as `0x${string}`;
+  const chainId = useChainId();
+  const contractAddress = getContractAddress(chainId) as `0x${string}`;
   
   // Only log when id changes
   useEffect(() => {
@@ -279,6 +317,7 @@ export const useMarket = (id: string | undefined) => {
       // Transform contract data to our Market type
       const transformedMarket: Market = {
         id,
+        creator: marketData.creator || "Not available",
         question: `Market for ${id.slice(0, 10)}...`, // This would come from an external source or IPFS
         description: `This is a prediction market with ID ${id.slice(0, 10)}...`, // This would come from an external source or IPFS
         endTime: Date.now() / 1000 + 86400 * 30, // Placeholder - would come from oracle or external source
