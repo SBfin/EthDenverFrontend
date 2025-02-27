@@ -6,7 +6,7 @@ import MarketDetail from '../../components/MarketDetail';
 import { useMarket } from '../../hooks/useMarkets';
 import { useMarketActions } from '../../hooks/useMarketActions';
 import styles from '../../styles/MarketPage.module.css';
-import { formatEther } from 'viem';
+import { formatEther, formatUnits } from 'viem';
 import { useAccount, useReadContract, useWriteContract } from 'wagmi';
 import { parseEther } from 'viem';
 import { ERC20Abi } from '../../deployments/abis/ERC20';
@@ -43,21 +43,21 @@ const MarketPage: NextPage = () => {
     address: market?.collateralToken as `0x${string}`,
     abi: ERC20Abi,
     functionName: 'allowance',
-    args: userAddress && market?.hookAddress ? [userAddress, market.hookAddress] : undefined,
+    args: userAddress && market?.hookAddress ? [userAddress as `0x${string}`, market.hookAddress as `0x${string}`] : undefined,
   });
 
   const { data: yesTokenAllowance } = useReadContract({
     address: market?.yesTokenAddress as `0x${string}`,
     abi: ERC20Abi,
     functionName: 'allowance',
-    args: userAddress && market?.hookAddress ? [userAddress, market.hookAddress] : undefined,
+    args: userAddress && market?.hookAddress ? [userAddress as `0x${string}`, market.hookAddress as `0x${string}`] : undefined,
   });
 
   const { data: noTokenAllowance } = useReadContract({
     address: market?.noTokenAddress as `0x${string}`,
     abi: ERC20Abi,
     functionName: 'allowance',
-    args: userAddress && market?.hookAddress ? [userAddress, market.hookAddress] : undefined,
+    args: userAddress && market?.hookAddress ? [userAddress as `0x${string}`, market.hookAddress as `0x${string}`] : undefined,
   });
 
   // Approve contract
@@ -312,7 +312,8 @@ const MarketPage: NextPage = () => {
   useEffect(() => {
     console.log('Raw quoted collateral:', quotedCollateral);
     if (quotedCollateral) {
-      const collateralAmount = formatEther(BigInt(Number(quotedCollateral)));
+      // Format based on 6 decimals for USDC instead of 18 (ether)
+      const collateralAmount = (Number(quotedCollateral) / 1e6).toFixed(4);
       console.log('Formatted collateral amount:', collateralAmount);
       setCollateralNeeded(collateralAmount);
     }
@@ -445,13 +446,8 @@ const MarketPage: NextPage = () => {
 
   // Format the collateral needed based on decimals
   const formatCollateralNeeded = (amount: string | number | undefined, decimals: number | undefined): string => {
-    if (amount === undefined || decimals === undefined) return '0.0000';
-
-    // Convert amount to a number and take absolute value
-    const absoluteAmount = Math.abs(Number(amount));
-    // Convert amount to a string and format based on decimals
-    const formatted = (absoluteAmount / Math.pow(10, decimals)).toFixed(4);
-    return formatted;
+    if (!amount || decimals === undefined) return '0.0000';
+    return Number(amount).toFixed(4);
   };
 
   const formattedCollateralNeeded = formatCollateralNeeded(collateralNeeded, collateralDecimals);
@@ -564,12 +560,12 @@ const MarketPage: NextPage = () => {
                   <div className={styles.collateralInfo}>
                     <div className={styles.collateralNeeded}>
                       {Number(collateralNeeded) >= 0 
-                        ? `Collateral needed: ${formatCollateralNeeded(collateralNeeded, collateralDecimals)} USDC`
-                        : `Collateral received: ${formatCollateralNeeded(collateralNeeded, collateralDecimals)} USDC`
+                        ? `Collateral needed: ${collateralNeeded} USDC`
+                        : `Collateral received: ${Math.abs(Number(collateralNeeded)).toFixed(4)} USDC`
                       }
                     </div>
                     <div className={styles.collateralBalance}>
-                      Available balance: {collateralBalanceFormatted} {market?.collateralTokenSymbol}
+                      Available balance: {collateralBalanceFormatted} USDC
                     </div>
                   </div>
                 )}
@@ -615,7 +611,12 @@ const MarketPage: NextPage = () => {
                 </div>
                 <div className={styles.detailRow}>
                   <span>Collateral Pool:</span>
-                  <span>{market?.collateralPoolSize} USDC</span>
+                  <span>
+                    {market?.collateralPoolSize 
+                      ? market.collateralPoolSize
+                      : '0.0000'
+                    } USDC
+                  </span>
                 </div>
                 <div className={styles.detailRow}>
                   <span>Status:</span>
