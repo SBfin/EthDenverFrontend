@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const PUBLISHER = process.env.WALRUS_PUBLISHER || '';
+const PUBLISHER = process.env.NEXT_PUBLIC_WALRUS_PUBLISHER || 'https://publisher.walrus-testnet.walrus.space';
 if (PUBLISHER == '') throw 'missing publisher';
 
 interface WalrusMarketData {
@@ -34,7 +34,7 @@ async function storeMarketData(marketData: WalrusMarketData[]) {
   }
 }
 
-const AGGREGATOR = process.env.WALRUS_AGGREGATOR || 'https://aggregator-url.example.com';
+const AGGREGATOR = process.env.NEXT_PUBLIC_WALRUS_AGGREGATOR || 'https://aggregator.walrus-testnet.walrus.space';
 if (AGGREGATOR == '') throw 'missing aggregator';
 
 async function getMarketData(blobId: string) {

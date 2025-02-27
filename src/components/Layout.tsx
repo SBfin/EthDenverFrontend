@@ -19,7 +19,7 @@ const Layout = ({ children, title = 'Prediction Market' }: LayoutProps) => {
 
       <header className={styles.header}>
         <div className={styles.logo}>
-          <h1>Prediction Market</h1>
+          <h1>{title}</h1>
         </div>
         <div className={styles.connectButton}>
           <ConnectButton />

@@ -1,9 +1,9 @@
 const addresses = {
     "baseSepolia": {
-        "marketMakerHook": "0x97ddbC1284054C9BCDD7aeE22342D5b1086f4A80",
-        "viewHelper": "0x6f5d6af82A9f6c1704eb1EA34E97D54b8BCAFC56",
-        "uniHelper": "0xf04D54EB8Ff21062A5B16C268ff0397455DE9E0A",
-        "collateralToken": "0xEb746628618DA8C4d161659926c1A62876B5E88B"
+        "marketMakerHook": "0x001ca0c6e5F7eBaA6Df0dfDfc4C264496E8d8A80",
+        "viewHelper": "0x7693074F3E8cfa5a411bc427365fA0137109db67",
+        "uniHelper": "0xE66AD7D932B9261d22cc77b79dEC7aD4c2985270",
+        "collateralToken": "0x4B5B734A133A4eB84fAc87750B00992260dA8096"
     },
     "unichainSepolia": {
         "marketMakerHook": "0x41dea8aa63D66EAa757917C439e2dD9547458A80",
@@ -12,5 +12,4 @@ const addresses = {
         "collateralToken": "0xaBe537945c7447935AE5a53d3a4E3acfB5aC7Bc8"
     }
 }
-
 export default addresses;

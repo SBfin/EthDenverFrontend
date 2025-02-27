@@ -16,6 +16,7 @@ import addresses from '../../deployments/addresses';
 import { IMarketMakerHookAbi } from '../../deployments/abis/IMarketMakerHook';
 import { Market } from '../../types/market';
 import { useQuoteCollateral } from '../../hooks/useViewHelper';
+import { useWalrusMarketData } from '../../hooks/useWalrusMarketData';
 
 const MarketPage: NextPage = () => {
   const router = useRouter();
@@ -96,7 +97,7 @@ const MarketPage: NextPage = () => {
         console.log('Contract write success:', data);
       }
     }
-  });
+  });  
 
   // Add this debug effect at the top level of your component
   useEffect(() => {

@@ -5,6 +5,7 @@ import { ViewHelper } from '../deployments/abis/ViewHelper';
 import addresses from '../deployments/addresses';
 import { Market } from '../types/market';
 import { formatEther } from 'viem';
+import { useWalrusMarketData } from './useWalrusMarketData';
 
 // Get the contract address based on the current chain by chainId
 const getContractAddress = (chainId: number) => {
@@ -273,6 +274,16 @@ export const useMarket = (id: string | undefined) => {
 
   const chainId = useChainId();
   const contractAddress = getContractAddress(chainId) as `0x${string}`;
+
+    const blobId = process.env.NEXT_PUBLIC_BLOB_ID || '';
+    const { data:walrusData, refetch}  = useWalrusMarketData(blobId, {
+      onSuccess: (data) => {
+        console.log('Successfully fetched market data:', blobId, data);
+      },
+      onError: (error) => {
+        console.error('Failed to fetch market data:', blobId, error);
+      }
+    });
   
   // Only log when id changes
   useEffect(() => {
@@ -340,10 +351,22 @@ export const useMarket = (id: string | undefined) => {
         oracleAddress: marketData.oracle || "Not available",
       };
 
+      if (walrusData) {
+        // Your data change logic here
+        for (const x of walrusData) {
+          if ("0x"+x.poolId == id) {
+            transformedMarket.description = x.description;
+            transformedMarket.question = x.description;
+          } 
+        }
+      }
+
+      console.log(`yo`, transformedMarket)
+
       setMarket(transformedMarket);
       setIsLoading(false);
     }
-  }, [id, data, isLoadingMarket, marketError]);
+  }, [id, data, isLoadingMarket, marketError, walrusData]);
 
   return { market, isLoading, error };
 }; 

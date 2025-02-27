@@ -36,7 +36,7 @@ const MarketCard: React.FC<MarketCardProps> = ({ market }) => {
   return (
     <Link href={`/market/${market.id}`}>
       <div className={styles.marketCard}>
-        <h3>{market.question}</h3>
+        <h3>{market.description}</h3>
         <div className={styles.marketInfo}>
           <div className={styles.probability}>
             <span>Probability:</span> {isLoading ? 'Loading...' : formatPercentage(probability)}

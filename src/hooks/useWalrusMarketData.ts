@@ -1,8 +1,13 @@
 import { useState, useEffect } from 'react';
 import { getMarketData } from '../lib/walrus'; // Update this path to match your project structure
 
+interface WalrusMarketData {
+  description: string;
+  poolId: string;
+}
+
 interface UseMarketDataResult {
-  data: any | null;
+  data: WalrusMarketData[] | null;
   isLoading: boolean;
   error: Error | null;
   refetch: () => Promise<void>;
