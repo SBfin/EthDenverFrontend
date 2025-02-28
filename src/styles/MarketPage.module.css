@@ -252,10 +252,9 @@
   background: #00a844;
 }
 
-.claimButton:disabled {
+.claimButton.claimed {
   background: #e0e0e0;
   color: #666;
-  cursor: not-allowed;
 }
 
 /* Approval Section */

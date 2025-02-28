@@ -285,6 +285,7 @@ const MarketPage: NextPage = () => {
     if (!amount || !market?.id) return;
 
     setIsSwapPending(true);
+    setTxStatus('waitingConfirmation');
     try {
       const contractAddresses = {
         84532: addresses.baseSepolia.marketMakerHook,
@@ -309,8 +310,7 @@ const MarketPage: NextPage = () => {
         ],
       });
 
-      console.log('Transaction submitted:', hash);
-      alert('Transaction submitted! Please wait for confirmation.');
+      setTxStatus('waitingExecution');
 
       // Wait for transaction to be mined
       await publicClient?.waitForTransactionReceipt({ hash });
@@ -323,15 +323,24 @@ const MarketPage: NextPage = () => {
       await Promise.all([
         refetchYesBalance(),
         refetchNoBalance(),
-        refetchTokenValues(),  // This will update probability and token values
+        refetchTokenValues(),
       ]);
 
-      alert('Transaction confirmed! Market data updated.');
+      setTxStatus('success');
+      setTimeout(() => {
+        setTxStatus('idle');
+      }, 2000);
+
     } catch (error: any) {
       console.error('Transaction failed:', error);
       const revertReason = error.cause?.reason || error.message;
       console.error('Revert reason:', revertReason);
-      alert(`Transaction failed: ${revertReason}`);
+      setTxStatus('error');
+      setTxError(revertReason);
+      setTimeout(() => {
+        setTxStatus('idle');
+        setTxError(null);
+      }, 3000);
     } finally {
       setIsSwapPending(false);
     }
@@ -666,15 +675,31 @@ const MarketPage: NextPage = () => {
 
   const handleClaim = async () => {
     try {
+      // Show waiting for confirmation
       setTxStatus('waitingConfirmation');
       const hash = await claim();
+      
+      // Show waiting for transaction
       setTxStatus('waitingExecution');
       await publicClient?.waitForTransactionReceipt({ hash });
+      
+      // Show success and auto-hide after 2 seconds
       setTxStatus('success');
+      setTimeout(() => {
+        setTxStatus('idle');
+      }, 2000);
+      
+      // Refresh market state
+      await refetchMarketState();
     } catch (error: any) {
       console.error('Claim error:', error);
       setTxStatus('error');
       setTxError(error.message);
+      // Auto-hide error after 3 seconds
+      setTimeout(() => {
+        setTxStatus('idle');
+        setTxError(null);
+      }, 3000);
     }
   };
 
@@ -869,13 +894,12 @@ const MarketPage: NextPage = () => {
                   </button>
                 )}
                 
-                {marketState?.state === MarketState.Resolved && (
+                {(marketState?.state === MarketState.Resolved || marketState?.state === MarketState.Claimed) && (
                   <button 
                     className={styles.claimButton}
                     onClick={handleClaim}
-                    disabled={isClaimPending || hasClaimed}
                   >
-                    {hasClaimed ? 'Already Claimed' : 
+                    {hasClaimed || marketState?.state === MarketState.Claimed ? 'Already Claimed' : 
                      isClaimPending ? 'Claiming...' : 
                      'Claim Winnings'}
                   </button>
