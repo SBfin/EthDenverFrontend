@@ -15,7 +15,6 @@ import { UniHelper } from '../../deployments/abis/UniHelper';
 import addresses from '../../deployments/addresses';
 import { IMarketMakerHookAbi } from '../../deployments/abis/IMarketMakerHook';
 import { Market } from '../../types/market';
-import { useQuoteCollateral } from '../../hooks/useViewHelper';
 import { useWalrusMarketData } from '../../hooks/useWalrusMarketData';
 import { useTokenValues } from '../../hooks/useViewHelper';
 import { useClaim } from '../../hooks/useClaim';
@@ -439,7 +438,6 @@ const MarketPage: NextPage = () => {
   };
 
   // Quote collateral needed for trade
-  const { getQuote } = useQuoteCollateral();
 
   // Move the useReadContract hook to component level
   const { data: quotedCollateral, error: quoteError } = useReadContract({

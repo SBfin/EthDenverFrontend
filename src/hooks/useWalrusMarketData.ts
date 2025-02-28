@@ -56,7 +56,7 @@ export function useWalrusMarketData(
     if (enabled) {
       fetchData();
     }
-  }, [blobId, enabled]);
+  }, [blobId, enabled, fetchData]);
 
   const refetch = async () => {
     await fetchData();

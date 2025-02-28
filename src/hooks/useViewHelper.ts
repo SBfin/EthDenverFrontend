@@ -349,47 +349,47 @@ export const useCollateralAmount = (
   return collateralAmount;
 };
 
-// Add a new hook for quoting collateral
-export const useQuoteCollateral = () => {
-  const chainId = useChainId();
-  const viewHelperAddress = getViewHelperAddress(chainId);
+// // Add a new hook for quoting collateral
+// export const useQuoteCollateral = () => {
+//   const chainId = useChainId();
+//   const viewHelperAddress = getViewHelperAddress(chainId);
 
-  const { data: quotedCollateral, refetch } = useReadContract({
-    address: viewHelperAddress as `0x${string}`,
-    abi: ViewHelper,
-    functionName: 'quoteCollateralNeededForTrade',
-    args: undefined, // We'll set this when calling refetch
-  });
+//   const { data: quotedCollateral, refetch } = useReadContract({
+//     address: viewHelperAddress as `0x${string}`,
+//     abi: ViewHelper,
+//     functionName: 'quoteCollateralNeededForTrade',
+//     args: undefined, // We'll set this when calling refetch
+//   });
 
-  const getQuote = async (
-    poolId: string | undefined,
-    amountNew: bigint,
-    amountOld: bigint,
-    collateralAmount: bigint,
-    collateralAddress: string | undefined
-  ) => {
-    if (!poolId || !collateralAddress) return null;
+//   const getQuote = async (
+//     poolId: string | undefined,
+//     amountNew: bigint,
+//     amountOld: bigint,
+//     collateralAmount: bigint,
+//     collateralAddress: string | undefined
+//   ) => {
+//     if (!poolId || !collateralAddress) return null;
 
-    try {
-      const result = await refetch({
-        args: [
-          poolId as `0x${string}`,
-          amountNew,
-          amountOld,
-          collateralAmount,
-          collateralAddress as `0x${string}`
-        ]
-      });
+//     try {
+//       const result = await refetch({
+//         args: [
+//           poolId as `0x${string}`,
+//           amountNew,
+//           amountOld,
+//           collateralAmount,
+//           collateralAddress as `0x${string}`
+//         ]
+//       });
 
-      return result.data;
-    } catch (err) {
-      console.error('Error getting quote:', err);
-      return null;
-    }
-  };
+//       return result.data;
+//     } catch (err) {
+//       console.error('Error getting quote:', err);
+//       return null;
+//     }
+//   };
 
  
 
 
-  return { getQuote, quotedCollateral };
-}; 
+//   return { getQuote, quotedCollateral };
+// }; 
