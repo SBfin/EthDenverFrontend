@@ -888,18 +888,18 @@ const MarketPage: NextPage = () => {
               </div>
               
               <div className={styles.resolutionActions}>
-                {marketState?.state === MarketState.Active && (
+                {marketState === MarketState.Active && (
                   <button className={styles.resolveButton}>
                     Resolve Market
                   </button>
                 )}
                 
-                {(marketState?.state === MarketState.Resolved || marketState?.state === MarketState.Claimed) && (
+                {(marketState === MarketState.Resolved || marketState === MarketState.Claimed) && (
                   <button 
                     className={styles.claimButton}
                     onClick={handleClaim}
                   >
-                    {hasClaimed || marketState?.state === MarketState.Claimed ? 'Already Claimed' : 
+                    {hasClaimed || marketState === MarketState.Claimed ? 'Already Claimed' : 
                      isClaimPending ? 'Claiming...' : 
                      'Claim Winnings'}
                   </button>
