@@ -70,9 +70,6 @@ const MarketDetail: React.FC<MarketDetailProps> = ({ market, onBuyShares }) => {
         <div className={styles.statCard}>
           <h3>Market Info</h3>
           <div className={styles.stat}>
-            <span>End Time:</span> {new Date(market.endTime * 1000).toLocaleString()}
-          </div>
-          <div className={styles.stat}>
             <span>Status:</span> {market.resolved ? 'Resolved' : 'Active'}
           </div>
           {market.resolved && (

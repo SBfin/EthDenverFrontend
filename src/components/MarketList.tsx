@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { Market } from '../types/market';
 import { useTokenValues, useCollateralAmount } from '../hooks/useViewHelper';
 import styles from '../styles/MarketList.module.css';
+import { formatUnits } from 'viem';
 
 interface MarketCardProps {
   market: Market;
@@ -21,62 +22,39 @@ const formatPercentage = (value: string) => {
 
 // Create a separate MarketCard component to use the hook for each market
 const MarketCard: React.FC<MarketCardProps> = ({ market }) => {
-  const { probability, yesValue, noValue, isLoading } = useTokenValues(
+  const { probability, isLoading } = useTokenValues(
     market.id,
     market.yesTokenAddress,
     market.noTokenAddress,
     market.collateralToken
   );
   
-  const { amount: collateralAmount, isLoading: isLoadingCollateral } = useCollateralAmount(
-    market.id,
-    market.collateralToken
-  );
-  
+  const shortenedAddress = market.collateralToken 
+    ? `${market.collateralToken.slice(0, 6)}...${market.collateralToken.slice(-4)}`
+    : '';
+
+  // Format pool size to a readable number with max 4 decimals
+  const formattedPoolSize = market.collateralPoolSize 
+
+
   return (
     <Link href={`/market/${market.id}`}>
       <div className={styles.marketCard}>
         <h3>{market.description}</h3>
         <div className={styles.marketInfo}>
-          <div className={styles.probability}>
-            <span>Probability:</span> {isLoading ? 'Loading...' : formatPercentage(probability)}
+          <div className={styles.infoRow}>
+            <span className={styles.label}>Probability:</span>
+            <span className={styles.value}>
+              {isLoading ? 'Loading...' : `${(Number(probability) * 100).toFixed(2)}%`}
+            </span>
           </div>
-          <div className={styles.endTime}>
-            <span>Ends:</span> {new Date(market.endTime * 1000).toLocaleDateString()}
+          <div className={styles.infoRow}>
+            <span className={styles.label}>Pool Size:</span>
+            <span className={styles.value}>{formattedPoolSize} USDC</span>
           </div>
-        </div>
-        
-        <div className={styles.tokenValues}>
-          <div className={styles.tokenValue}>
-            <span>YES Value:</span> {isLoading ? 'Loading...' : yesValue}
-          </div>
-          <div className={styles.tokenValue}>
-            <span>NO Value:</span> {isLoading ? 'Loading...' : noValue}
-          </div>
-        </div>
-        
-        <div className={styles.technicalDetails}>
-          <h4>Technical Details</h4>
-          <div className={styles.detailRow}>
-            <span>Pool ID:</span> {truncateAddress(market.id)}
-          </div>
-          <div className={styles.detailRow}>
-            <span>YES Token:</span> {truncateAddress(market.yesTokenAddress)}
-          </div>
-          <div className={styles.detailRow}>
-            <span>NO Token:</span> {truncateAddress(market.noTokenAddress)}
-          </div>
-          <div className={styles.detailRow}>
-            <span>Hook:</span> {truncateAddress(market.hookAddress)}
-          </div>
-          <div className={styles.detailRow}>
-            <span>Collateral:</span> {truncateAddress(market.collateralToken)}
-          </div>
-          <div className={styles.detailRow}>
-            <span>Collateral Amount:</span> {isLoadingCollateral ? 'Loading...' : collateralAmount}
-          </div>
-          <div className={styles.detailRow}>
-            <span>Oracle:</span> {truncateAddress(market.oracleAddress)}
+          <div className={styles.infoRow}>
+            <span className={styles.label}>Collateral:</span>
+            <span className={styles.value}>{shortenedAddress}</span>
           </div>
         </div>
       </div>

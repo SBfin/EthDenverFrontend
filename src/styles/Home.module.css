@@ -1,5 +1,6 @@
 .container {
   padding: 0 2rem;
+  background-color: #ffffff;
 }
 
 .main {
@@ -16,9 +17,10 @@
   display: flex;
   flex: 1;
   padding: 2rem 0;
-  border-top: 1px solid #eaeaea;
+  border-top: 1px solid #e8f4fc;
   justify-content: center;
   align-items: center;
+  color: #6b7c93;
 }
 
 .footer a {
@@ -29,13 +31,14 @@
 }
 
 .title a {
-  color: #0d76fc;
+  color: #3dd5b0;
   text-decoration: none;
 }
 
 .title a:hover,
 .title a:focus,
 .title a:active {
+  color: #1a2b4c;
   text-decoration: underline;
 }
 
@@ -68,19 +71,21 @@
   margin: 1rem;
   padding: 1.5rem;
   text-align: left;
-  color: inherit;
+  color: #1a2b4c;
+  background-color: #ffffff;
   text-decoration: none;
-  border: 1px solid #eaeaea;
+  border: 1px solid #e8f4fc;
   border-radius: 10px;
-  transition: color 0.15s ease, border-color 0.15s ease;
+  transition: all 0.15s ease;
   max-width: 350px;
 }
 
 .card:hover,
 .card:focus,
 .card:active {
-  color: #0d76fc;
-  border-color: #0d76fc;
+  color: #1a2b4c;
+  border-color: #3dd5b0;
+  background-color: #edfaf6;
 }
 
 .card h2 {
@@ -104,9 +109,9 @@
 .error {
   padding: 1rem;
   margin-bottom: 1.5rem;
-  background-color: #f8d7da;
-  color: #721c24;
-  border: 1px solid #f5c6cb;
+  background-color: #ff3b30;
+  color: #ffffff;
+  border: 1px solid #ff3b30;
   border-radius: 4px;
   text-align: center;
 }
@@ -117,5 +122,5 @@
   align-items: center;
   min-height: 300px;
   font-size: 1.25rem;
-  color: #6c757d;
+  color: #6b7c93;
 }

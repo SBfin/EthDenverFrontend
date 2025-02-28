@@ -68,7 +68,7 @@ const Home: NextPage = () => {
   }, [markets, isLoading, error]);
 
   return (
-    <Layout title="Prediction Markets">
+    <Layout title="Vista Markets">
       <div className={styles.container}>
         {error && (
           <div className={styles.error}>

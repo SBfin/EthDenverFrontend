@@ -28,6 +28,7 @@ const MarketPage: NextPage = () => {
   const initialRender = useRef(true);
   const idRef = useRef(id);
   const publicClient = usePublicClient();
+  const [isSwapPending, setIsSwapPending] = useState(false);
   
   // Only log when id changes
   useEffect(() => {
@@ -279,34 +280,59 @@ const MarketPage: NextPage = () => {
   }, [market, isLoading, error]);
 
   const handleTrade = async (outcome: 'YES' | 'NO') => {
+    const amount = outcome === 'YES' ? yesAmount : noAmount;
+    if (!amount || !market?.id) return;
+
+    setIsSwapPending(true);
     try {
-      setTxStatus('waitingConfirmation');
-      const amount = outcome === 'YES' ? yesAmount : noAmount;
-      
+      const contractAddresses = {
+        84532: addresses.baseSepolia.marketMakerHook,
+        1301: addresses.unichainSepolia.marketMakerHook
+      };
+
+      const hookAddress = contractAddresses[chainId as keyof typeof contractAddresses];
+      if (!hookAddress) {
+        throw new Error(`No hook address for chain ID ${chainId}`);
+      }
+
       const hash = await executeSwap({
-        address: getHookAddress(chainId) as `0x${string}`,
+        address: hookAddress as `0x${string}`,
         abi: IMarketMakerHookAbi,
         functionName: 'executeSwap',
         args: [
-          market?.id as `0x${string}`,
+          market.id as `0x${string}`,
           outcome === 'YES',
-          tradeType === 'sell' ? -parseEther(amount) : parseEther(amount),
+          tradeType === 'buy'
+            ? parseEther(amount)
+            : -parseEther(amount),
         ],
       });
 
-      setTxStatus('waitingExecution');
+      console.log('Transaction submitted:', hash);
+      alert('Transaction submitted! Please wait for confirmation.');
+
+      // Wait for transaction to be mined
       await publicClient?.waitForTransactionReceipt({ hash });
       
-      setTxStatus('success');
-      setTimeout(() => setTxStatus('idle'), 500);
-    } catch (error) {
-      console.error('Trade Error:', error);
-      setTxStatus('error');
-      setTxError((error as Error).message);
-      setTimeout(() => {
-        setTxStatus('idle');
-        setTxError(null);
-      }, 500);
+      // Reset input fields
+      setYesAmount('');
+      setNoAmount('');
+      
+      // Refresh all relevant data
+      await Promise.all([
+        refetchYesBalance(),
+        refetchNoBalance(),
+        refetchTokenValues(),  // This will update probability and token values
+      ]);
+
+      alert('Transaction confirmed! Market data updated.');
+    } catch (error: any) {
+      console.error('Transaction failed:', error);
+      const revertReason = error.cause?.reason || error.message;
+      console.error('Revert reason:', revertReason);
+      alert(`Transaction failed: ${revertReason}`);
+    } finally {
+      setIsSwapPending(false);
     }
   };
 
@@ -395,15 +421,9 @@ const MarketPage: NextPage = () => {
     functionName: 'decimals',
   });
 
-  const formatTokenAmount = (amount: bigint | undefined, decimals: number | undefined): string => {
-    if (!amount) return '0.0000';
-    try {
-      const formatted = formatEther(amount);
-      return Number(formatted).toFixed(4);
-    } catch (error) {
-      console.error('Error formatting token amount:', error);
-      return '0.0000';
-    }
+  const formatTokenAmount = (amount: bigint | undefined, decimals: number): string => {
+    if (!amount) return '0';
+    return formatUnits(amount, decimals);
   };
 
   // Quote collateral needed for trade
@@ -455,7 +475,7 @@ const MarketPage: NextPage = () => {
     });
   }, [market?.id, tradeType, yesAmount, noAmount]);
 
-  // Add this near your other useReadContract hooks
+  // Add this near other useReadContract hooks
   const { data: collateralBalance } = useReadContract({
     address: market?.collateralToken as `0x${string}`,
     abi: ERC20Abi,
@@ -472,7 +492,7 @@ const MarketPage: NextPage = () => {
 
   // Update the formatCollateralBalance function to handle decimals
   const formatCollateralBalance = (balance: bigint | undefined, decimals: number | undefined): string => {
-    if (!balance || decimals === undefined) return '0.0000';
+    if (!balance || decimals === undefined) return '0';
     
     // Convert balance to a string and format based on decimals
     const formatted = (Number(balance) / Math.pow(10, decimals)).toFixed(decimals);
@@ -480,20 +500,18 @@ const MarketPage: NextPage = () => {
   };
 
   // Add these hooks to get token balances with error handling
-  const { data: yesTokenBalance, error: yesBalanceError } = useReadContract({
+  const { data: yesTokenBalance, refetch: refetchYesBalance } = useReadContract({
     address: market?.yesTokenAddress as `0x${string}`,
     abi: ERC20Abi,
     functionName: 'balanceOf',
-    args: [userAddress ?? '0x0000000000000000000000000000000000000000'],
-    chainId, // Explicitly specify the chain ID
+    args: userAddress ? [userAddress as `0x${string}`] : undefined,
   });
 
-  const { data: noTokenBalance, error: noBalanceError } = useReadContract({
+  const { data: noTokenBalance, refetch: refetchNoBalance } = useReadContract({
     address: market?.noTokenAddress as `0x${string}`,
     abi: ERC20Abi,
     functionName: 'balanceOf',
-    args: [userAddress ?? '0x0000000000000000000000000000000000000000'],
-    chainId, // Explicitly specify the chain ID
+    args: userAddress ? [userAddress as `0x${string}`] : undefined,
   });
 
   // Add debug logging
@@ -504,11 +522,9 @@ const MarketPage: NextPage = () => {
       noTokenAddress: market?.noTokenAddress,
       userAddress,
       yesBalance: yesTokenBalance?.toString(),
-      noBalance: noTokenBalance?.toString(),
-      yesError: yesBalanceError,
-      noError: noBalanceError
+      noBalance: noTokenBalance?.toString()
     });
-  }, [chainId, market, userAddress, yesTokenBalance, noTokenBalance, yesBalanceError, noBalanceError]);
+  }, [chainId, market, userAddress, yesTokenBalance, noTokenBalance]);
 
   // Add this useEffect to log token addresses
   useEffect(() => {
@@ -755,9 +771,9 @@ const MarketPage: NextPage = () => {
                   <button 
                     className={styles.tradeButton}
                     onClick={() => handleTrade('YES')}
-                    disabled={isActionLoading}
+                    disabled={isActionLoading || isSwapPending}
                   >
-                    {tradeType === 'buy' ? 'Buy YES' : 'Sell YES'}
+                    {isSwapPending ? 'Processing...' : tradeType === 'buy' ? 'Buy YES' : 'Sell YES'}
                   </button>
                 </div>
                 <div className={styles.option}>
@@ -774,9 +790,9 @@ const MarketPage: NextPage = () => {
                   <button 
                     className={styles.tradeButton}
                     onClick={() => handleTrade('NO')}
-                    disabled={isActionLoading}
+                    disabled={isActionLoading || isSwapPending}
                   >
-                    {tradeType === 'buy' ? 'Buy NO' : 'Sell NO'}
+                    {isSwapPending ? 'Processing...' : tradeType === 'buy' ? 'Buy NO' : 'Sell NO'}
                   </button>
                 </div>
                 {(yesAmount || noAmount) && (
@@ -816,21 +832,47 @@ const MarketPage: NextPage = () => {
             </div>
           </div>
 
-          {market?.resolved ? (
-            <button 
-              className={styles.claimButton}
-              onClick={handleClaim}
-              disabled={isClaimPending || hasClaimed}
-            >
-              {hasClaimed ? 'Already Claimed' : 
-               isClaimPending ? 'Claiming...' : 
-               'Claim Winnings'}
-            </button>
-          ) : (
-            <button className={styles.resolveButton}>
-              Resolve Market
-            </button>
-          )}
+          <div className={styles.resolutionContainer}>
+            <h2>Market Resolution</h2>
+            <div className={styles.resolutionContent}>
+              <div className={styles.stateInfo}>
+                <div className={styles.detailRow}>
+                  <span className={styles.label}>Status:</span>
+                  <span className={styles.statusValue}>
+                    {market?.resolved ? 'Resolved' : 'Active'}
+                  </span>
+                </div>
+                {market?.resolved && (
+                  <div className={styles.detailRow}>
+                    <span className={styles.label}>Outcome:</span>
+                    <span className={styles.outcomeValue}>
+                      {market?.outcome ? 'YES' : 'NO'}
+                    </span>
+                  </div>
+                )}
+              </div>
+              
+              <div className={styles.resolutionActions}>
+                {!market?.resolved && (
+                  <button className={styles.resolveButton}>
+                    Resolve Market
+                  </button>
+                )}
+                
+                {true && (
+                  <button 
+                    className={styles.claimButton}
+                    onClick={handleClaim}
+                    disabled={isClaimPending || hasClaimed}
+                  >
+                    {hasClaimed ? 'Already Claimed' : 
+                     isClaimPending ? 'Claiming...' : 
+                     'Claim Winnings'}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
         <TransactionStatusOverlay />
       </div>
