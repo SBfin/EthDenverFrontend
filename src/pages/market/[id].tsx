@@ -75,6 +75,7 @@ const MarketPage: NextPage = () => {
       userAddress as `0x${string}`, 
       getHookAddress(chainId) as `0x${string}`
     ] : undefined,
+    chainId,
   });
 
   const { data: noTokenAllowance } = useReadContract({
@@ -85,6 +86,7 @@ const MarketPage: NextPage = () => {
       userAddress as `0x${string}`, 
       getHookAddress(chainId) as `0x${string}`
     ] : undefined,
+    chainId,
   });
 
   // Approve contract
@@ -427,28 +429,51 @@ const MarketPage: NextPage = () => {
   // Quote collateral needed for trade
   const { getQuote } = useQuoteCollateral();
 
-  const handleQuote = async (outcome: 'YES' | 'NO', amount: string) => {
-    if (!market?.id || !amount) return;
+  // Add logging for raw collateral amount
+  const { data: quotedCollateral, error: quoteError } = useReadContract({
+    address: (chainId === 84532 
+      ? addresses.baseSepolia.viewHelper 
+      : addresses.unichainSepolia.viewHelper) as `0x${string}`,
+    abi: ViewHelper,
+    functionName: 'quoteCollateralNeededForTrade',
+    args: [
+      market?.id as `0x${string}` ?? '0x0000000000000000000000000000000000000000000000000000000000000000',
+      tradeType === 'sell'
+        ? parseEther('100') + parseEther(yesAmount || noAmount || '0')
+        : parseEther('100') - parseEther(yesAmount || noAmount || '0'),
+      parseEther('100'), // amountOld (current supply)
+      parseEther(market?.collateralPoolSize || '0'), // collateralAmount
+      market?.collateralToken as `0x${string}` ?? '0x0000000000000000000000000000000000000000'
+    ],
+    chainId,
+  });
 
-    try {
-      const amountBigInt = parseEther(amount);
-      const quotedCollateral = await getQuote(
-        market.id,
-        amountBigInt,
-        BigInt(100), // amountOld - 0 for new trades
-        BigInt(100), // current collateral amount
-        market.collateralToken
-      );
-
-      if (quotedCollateral) {
-        // Format based on 6 decimals for USDC
-        const formattedQuote = formatUnits(quotedCollateral, 6);
-        setCollateralNeeded(formattedQuote);
-      }
-    } catch (err) {
-      console.error('Error getting quote:', err);
+  // Log raw values and calculation details
+  useEffect(() => {
+    if (quotedCollateral) {
+      console.log('Quote Debug:', {
+        raw: quotedCollateral.toString(),
+        formatted: formatUnits(quotedCollateral, 6),
+        args: {
+          marketId: market?.id,
+          amountNew: tradeType === 'sell'
+            ? `${parseEther('100') + parseEther(yesAmount || noAmount || '0')}`
+            : `${parseEther('100') - parseEther(yesAmount || noAmount || '0')}`,
+          amountOld: parseEther('100').toString(),
+          collateralAmount: parseEther(market?.collateralPoolSize || '0').toString(),
+          collateralToken: market?.collateralToken
+        }
+      });
     }
-  };
+  }, [quotedCollateral, market, tradeType, yesAmount, noAmount]);
+
+  // Update collateralNeeded when quotedCollateral changes
+  useEffect(() => {
+    if (quotedCollateral) {
+      const formattedQuote = formatUnits(quotedCollateral, 6);
+      setCollateralNeeded(formattedQuote);
+    }
+  }, [quotedCollateral]);
 
   // Also log when amounts change
   useEffect(() => {
@@ -579,7 +604,8 @@ const MarketPage: NextPage = () => {
   };
 
   const formattedCollateralNeeded = formatCollateralNeeded(collateralNeeded, collateralDecimals);
-
+  
+  
   // Log collateralNeeded to check its value
   useEffect(() => {
     console.log('Collateral Needed:', collateralNeeded);
@@ -589,21 +615,73 @@ const MarketPage: NextPage = () => {
     <Layout title={market?.question || 'Loading Market...'}>
       <div className={styles.marketPage}>
         <div className={styles.leftPanel}>
-          <div className={styles.chartContainer}>
-            <h2>Probability Chart</h2>
-            {/* Chart component will go here */}
+          <div className={styles.probabilityContainer}>
+            <h2>Probability</h2>
+            <div className={styles.probabilityNumber}>
+              {market?.probability || '50'}%
+            </div>
           </div>
-          
-          <div className={styles.transactionsContainer}>
-            <h2>Transactions</h2>
-            <div className={styles.transactionsList}>
-              {/* Example transaction list - replace with real data */}
-              <div className={styles.transaction}>
-                <span>Buy 100 YES shares</span>
-                <span>0.5 ETH</span>
-                <span>2 hours ago</span>
+
+          <div className={styles.infoGrid}>
+            <div className={styles.infoCard}>
+              <h2>Market Info</h2>
+              <div className={styles.cardContent}>
+                <div className={styles.infoRow}>
+                  <span className={styles.infoLabel}>Total Collateral:</span>
+                  <span className={styles.infoValue}>{market?.collateralPoolSize || '0'} USDC</span>
+                </div>
+                <div className={styles.infoRow}>
+                  <span className={styles.infoLabel}>Creator:</span>
+                  <span className={styles.infoValue}>{market?.creator?.slice(0, 6)}...{market?.creator?.slice(-4)}</span>
+                </div>
+                <div className={styles.infoRow}>
+                  <span className={styles.infoLabel}>Yes Shares Value:</span>
+                  <span className={styles.infoValue}>{market?.yesPrice || '0'} USDC</span>
+                </div>
+                <div className={styles.infoRow}>
+                  <span className={styles.infoLabel}>No Shares Value:</span>
+                  <span className={styles.infoValue}>{market?.noPrice || '0'} USDC</span>
+                </div>
+                <div className={styles.infoRow}>
+                  <span className={styles.infoLabel}>Oracle:</span>
+                  <span className={styles.infoValue}>{market?.oracleAddress?.slice(0, 6)}...{market?.oracleAddress?.slice(-4)}</span>
+                </div>
               </div>
-              {/* Add more transactions */}
+            </div>
+
+            <div className={styles.infoCard}>
+              <h2>Your Shares</h2>
+              <div className={styles.cardContent}>
+                <div className={styles.infoRow}>
+                  <span className={styles.infoLabel}>YES Shares:</span>
+                  <span className={styles.infoValue}>{formatTokenAmount(
+                    typeof yesTokenBalance === 'bigint' ? yesTokenBalance : undefined,
+                    Number(yesTokenDecimals)
+                  )}</span>
+                </div>
+                <div className={styles.infoRow}>
+                  <span className={styles.infoLabel}>NO Shares:</span>
+                  <span className={styles.infoValue}>{formatTokenAmount(
+                    typeof noTokenBalance === 'bigint' ? noTokenBalance : undefined,
+                    Number(noTokenDecimals)
+                  )}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className={styles.infoCard}>
+              <h2>Resolution</h2>
+              <div className={styles.cardContent}>
+                {market?.resolved ? (
+                  <button className={styles.claimButton}>
+                    Claim Winnings
+                  </button>
+                ) : (
+                  <button className={styles.resolveButton}>
+                    Resolve Market
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -611,8 +689,7 @@ const MarketPage: NextPage = () => {
         <div className={styles.rightPanel}>
           <div className={styles.tradingContainer}>
             <h2>Trade Shares</h2>
-                        
-
+            
             <div className={styles.tradeTypeSelector}>
               <button 
                 className={`${styles.tradeTypeButton} ${tradeType === 'buy' ? styles.active : ''}`}
@@ -657,7 +734,6 @@ const MarketPage: NextPage = () => {
                     value={yesAmount}
                     onChange={(e) => {
                       setYesAmount(e.target.value);
-                      handleQuote('YES', e.target.value);
                     }}
                   />
                   <button 
@@ -703,75 +779,6 @@ const MarketPage: NextPage = () => {
               </div>
             )}
           </div>
-
-          <div className={styles.sharesContainer}>
-            <h2>Your Shares</h2>
-            <div className={styles.shareDetails}>
-              <div className={styles.shareRow}>
-                <span>YES Shares:</span>
-                <span>{formatTokenAmount(
-                  typeof yesTokenBalance === 'bigint' ? yesTokenBalance : undefined,
-                  Number(yesTokenDecimals)
-                )}</span>
-              </div>
-              <div className={styles.shareRow}>
-                <span>NO Shares:</span>
-                <span>{formatTokenAmount(
-                  typeof noTokenBalance === 'bigint' ? noTokenBalance : undefined,
-                  Number(noTokenDecimals)
-                )}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className={styles.marketDetailsContainer}>
-            <details className={styles.marketDetails}>
-              <summary>Market Details</summary>
-              <div className={styles.detailsContent}>
-                <div className={styles.detailRow}>
-                  <span>Question:</span>
-                  <span>{market?.question}</span>
-                </div>
-                <div className={styles.detailRow}>
-                  <span>Description:</span>
-                  <span>{market?.description}</span>
-                </div>
-                <div className={styles.detailRow}>
-                  <span>End Time:</span>
-                  <span>{new Date(market?.endTime || 0 * 1000).toLocaleString()}</span>
-                </div>
-                <div className={styles.detailRow}>
-                  <span>Collateral Pool:</span>
-                  <span>
-                    {market?.collateralPoolSize 
-                      ? market.collateralPoolSize
-                      : '0.0000'
-                    } USDC
-                  </span>
-                </div>
-                <div className={styles.detailRow}>
-                  <span>Status:</span>
-                  <span>{market?.resolved ? 'Resolved' : 'Active'}</span>
-                </div>
-                {market?.resolved && (
-                  <div className={styles.detailRow}>
-                    <span>Outcome:</span>
-                    <span>{market.outcome ? 'YES' : 'NO'}</span>
-                  </div>
-                )}
-              </div>
-            </details>
-          </div>
-
-          {market?.resolved ? (
-            <button className={styles.claimButton}>
-              Claim Winnings
-            </button>
-          ) : (
-            <button className={styles.resolveButton}>
-              Resolve Market
-            </button>
-          )}
         </div>
       </div>
     </Layout>
