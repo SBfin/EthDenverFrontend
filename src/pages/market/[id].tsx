@@ -18,6 +18,7 @@ import { Market } from '../../types/market';
 import { useQuoteCollateral } from '../../hooks/useViewHelper';
 import { useWalrusMarketData } from '../../hooks/useWalrusMarketData';
 import { useTokenValues } from '../../hooks/useViewHelper';
+import { useClaim } from '../../hooks/useClaim';
 type TransactionStatus = 'idle' | 'waitingConfirmation' | 'waitingExecution' | 'success' | 'error';
 
 const MarketPage: NextPage = () => {
@@ -644,6 +645,22 @@ const MarketPage: NextPage = () => {
     `${(Number(probability) * 100).toFixed(1)}` : 
     '50.0';
 
+  const { claim, hasClaimed, isPending: isClaimPending } = useClaim(market?.id, userAddress);
+
+  const handleClaim = async () => {
+    try {
+      setTxStatus('waitingConfirmation');
+      const hash = await claim();
+      setTxStatus('waitingExecution');
+      await publicClient?.waitForTransactionReceipt({ hash });
+      setTxStatus('success');
+    } catch (error: any) {
+      console.error('Claim error:', error);
+      setTxStatus('error');
+      setTxError(error.message);
+    }
+  };
+
   return (
     <Layout title={market?.question || 'Loading Market...'}>
       <div className={styles.marketPage}>
@@ -800,8 +817,14 @@ const MarketPage: NextPage = () => {
           </div>
 
           {market?.resolved ? (
-            <button className={styles.claimButton}>
-              Claim Winnings
+            <button 
+              className={styles.claimButton}
+              onClick={handleClaim}
+              disabled={isClaimPending || hasClaimed}
+            >
+              {hasClaimed ? 'Already Claimed' : 
+               isClaimPending ? 'Claiming...' : 
+               'Claim Winnings'}
             </button>
           ) : (
             <button className={styles.resolveButton}>
