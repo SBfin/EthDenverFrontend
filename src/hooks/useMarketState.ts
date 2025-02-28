@@ -23,12 +23,21 @@ export const useMarketState = (marketId: string | undefined) => {
 
   const viewHelperAddress = getHookAddress(chainId);
 
-  const { data: marketState, refetch: refetchMarketState } = useReadContract({
-    address: viewHelperAddress as `0x${string}`,
-    abi: ViewHelper,
-    functionName: 'getMarket',
-    args: marketId ? [marketId as `0x${string}`] : undefined,
-  });
+  const { data: marketState, refetch: refetchMarketState } = useReadContract(
+    marketId
+      ? {
+          address: viewHelperAddress as `0x${string}`,
+          abi: ViewHelper,
+          functionName: 'getMarket',
+          args: [marketId as `0x${string}`],
+        }
+      : {
+          address: viewHelperAddress as `0x${string}`,
+          abi: ViewHelper,
+          functionName: 'getMarket',
+          args: [] as any, // or provide a valid default
+        }
+  );
 
   // Add debug logging
   console.log('Market State Data:', {

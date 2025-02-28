@@ -276,6 +276,7 @@ export const useMarket = (id: string | undefined) => {
   const contractAddress = getContractAddress(chainId) as `0x${string}`;
 
     const blobId = process.env.NEXT_PUBLIC_BLOB_ID || '';
+    // if (blobId == '') throw 'blobId not added'
     const { data:walrusData, refetch}  = useWalrusMarketData(blobId, {
       onSuccess: (data) => {
         console.log('Successfully fetched market data:', blobId, data);
@@ -351,17 +352,16 @@ export const useMarket = (id: string | undefined) => {
         oracleAddress: marketData.oracle || "Not available",
       };
 
+      console.log('walrusdata', walrusData)
       if (walrusData) {
         // Your data change logic here
         for (const x of walrusData) {
-          if ("0x"+x.poolId == id) {
+          if ("0x"+x.poolId == id || x.poolId == id) {
             transformedMarket.description = x.description;
             transformedMarket.question = x.description;
           } 
         }
       }
-
-      console.log(`yo`, transformedMarket)
 
       setMarket(transformedMarket);
       setIsLoading(false);
