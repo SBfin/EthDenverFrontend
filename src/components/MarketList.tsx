@@ -53,8 +53,8 @@ const MarketCard: React.FC<MarketCardProps> = ({ market }) => {
             <span className={styles.value}>{formattedPoolSize} USDC</span>
           </div>
           <div className={styles.infoRow}>
-            <span className={styles.label}>Collateral:</span>
-            <span className={styles.value}>{shortenedAddress}</span>
+            <span className={styles.label}>Oracle:</span>
+            <span className={styles.value}>{truncateAddress(market.oracleAddress)}</span>
           </div>
         </div>
       </div>
