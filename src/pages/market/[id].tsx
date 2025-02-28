@@ -39,7 +39,7 @@ const MarketPage: NextPage = () => {
   }, [id]);
   
   const { market, isLoading, error } = useMarket(id as string);
-  const { buyShares, isLoading: isActionLoading } = useMarketActions();
+  const { isLoading: isActionLoading } = useMarketActions();
   const { address: userAddress } = useAccount();
   const [tradeType, setTradeType] = useState<'buy' | 'sell'>('buy');
   const [yesAmount, setYesAmount] = useState('');
