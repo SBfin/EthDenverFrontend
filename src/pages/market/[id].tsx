@@ -427,28 +427,36 @@ const MarketPage: NextPage = () => {
   // Quote collateral needed for trade
   const { getQuote } = useQuoteCollateral();
 
-  const handleQuote = async (outcome: 'YES' | 'NO', amount: string) => {
-    if (!market?.id || !amount) return;
+  // Move the useReadContract hook to component level
+  const { data: quotedCollateral, error: quoteError } = useReadContract({
+    address: (chainId === 84532 
+      ? addresses.baseSepolia.viewHelper 
+      : addresses.unichainSepolia.viewHelper) as `0x${string}`,
+    abi: ViewHelper,
+    functionName: 'quoteCollateralNeededForTrade',
+    args: [
+      market?.id as `0x${string}` ?? '0x0000000000000000000000000000000000000000000000000000000000000000',
+      tradeType === 'sell'
+        ? parseEther('100') + parseEther(yesAmount || noAmount || '0')
+        : parseEther('100') - parseEther(yesAmount || noAmount || '0'),
+      parseEther('100'), // amountOld (current supply)
+      parseEther(market?.collateralPoolSize || '0'), // collateralAmount
+      market?.collateralToken as `0x${string}` ?? '0x0000000000000000000000000000000000000000'
+    ],
+    chainId,
+  });
 
-    try {
-      const amountBigInt = parseEther(amount);
-      const quotedCollateral = await getQuote(
-        market.id,
-        amountBigInt,
-        BigInt(100), // amountOld - 0 for new trades
-        BigInt(100), // current collateral amount
-        market.collateralToken
-      );
-
-      if (quotedCollateral) {
-        // Format based on 6 decimals for USDC
-        const formattedQuote = formatUnits(quotedCollateral, 6);
-        setCollateralNeeded(formattedQuote);
-      }
-    } catch (err) {
-      console.error('Error getting quote:', err);
+  // Update collateralNeeded when quotedCollateral changes
+  useEffect(() => {
+    if (quotedCollateral) {
+      const formattedQuote = formatUnits(quotedCollateral, 6);
+      setCollateralNeeded(formattedQuote);
+      console.log('Quote updated:', {
+        raw: quotedCollateral.toString(),
+        formatted: formattedQuote
+      });
     }
-  };
+  }, [quotedCollateral]);
 
   // Also log when amounts change
   useEffect(() => {
@@ -585,6 +593,21 @@ const MarketPage: NextPage = () => {
     console.log('Collateral Needed:', collateralNeeded);
   }, [collateralNeeded]);
 
+  // Add debug logging
+  useEffect(() => {
+    console.log('Quote Request Debug:', {
+      marketId: market?.id,
+      tradeType,
+      amount: yesAmount || noAmount,
+      chainId,
+      viewHelperAddress: chainId === 84532 
+        ? addresses.baseSepolia.viewHelper 
+        : addresses.unichainSepolia.viewHelper,
+      quotedCollateral: quotedCollateral?.toString(),
+      quoteError: quoteError?.message
+    });
+  }, [market?.id, tradeType, yesAmount, noAmount, chainId, quotedCollateral, quoteError]);
+
   return (
     <Layout title={market?.question || 'Loading Market...'}>
       <div className={styles.marketPage}>
@@ -655,10 +678,7 @@ const MarketPage: NextPage = () => {
                     type="number" 
                     placeholder="Amount" 
                     value={yesAmount}
-                    onChange={(e) => {
-                      setYesAmount(e.target.value);
-                      handleQuote('YES', e.target.value);
-                    }}
+                    onChange={(e) => setYesAmount(e.target.value)}
                   />
                   <button 
                     className={styles.tradeButton}
