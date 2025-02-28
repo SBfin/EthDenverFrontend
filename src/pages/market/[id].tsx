@@ -19,6 +19,7 @@ import { useQuoteCollateral } from '../../hooks/useViewHelper';
 import { useWalrusMarketData } from '../../hooks/useWalrusMarketData';
 import { useTokenValues } from '../../hooks/useViewHelper';
 import { useClaim } from '../../hooks/useClaim';
+import { useMarketState, MarketState } from '../../hooks/useMarketState';
 type TransactionStatus = 'idle' | 'waitingConfirmation' | 'waitingExecution' | 'success' | 'error';
 
 const MarketPage: NextPage = () => {
@@ -677,6 +678,13 @@ const MarketPage: NextPage = () => {
     }
   };
 
+  const { 
+    marketState, 
+    isResolved, 
+    isClaimed, 
+    refetchMarketState 
+  } = useMarketState(market?.id);
+
   return (
     <Layout title={market?.question || 'Loading Market...'}>
       <div className={styles.marketPage}>
@@ -839,10 +847,12 @@ const MarketPage: NextPage = () => {
                 <div className={styles.detailRow}>
                   <span className={styles.label}>Status:</span>
                   <span className={styles.statusValue}>
-                    {market?.resolved ? 'Resolved' : 'Active'}
+                    {marketState === MarketState.Active ? 'Active' : 
+                     marketState === MarketState.Resolved ? 'Resolved' :
+                     marketState === MarketState.Claimed ? 'Claimed' : 'Unknown'}
                   </span>
                 </div>
-                {market?.resolved && (
+                {isResolved && (
                   <div className={styles.detailRow}>
                     <span className={styles.label}>Outcome:</span>
                     <span className={styles.outcomeValue}>
@@ -853,13 +863,13 @@ const MarketPage: NextPage = () => {
               </div>
               
               <div className={styles.resolutionActions}>
-                {!market?.resolved && (
+                {marketState?.state === MarketState.Active && (
                   <button className={styles.resolveButton}>
                     Resolve Market
                   </button>
                 )}
                 
-                {true && (
+                {marketState?.state === MarketState.Resolved && (
                   <button 
                     className={styles.claimButton}
                     onClick={handleClaim}
