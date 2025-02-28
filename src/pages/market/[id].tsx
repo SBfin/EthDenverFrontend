@@ -83,6 +83,7 @@ const MarketPage: NextPage = () => {
       userAddress as `0x${string}`, 
       getHookAddress(chainId) as `0x${string}`
     ] : undefined,
+    chainId,
   });
 
   const { data: noTokenAllowance } = useReadContract({
@@ -93,6 +94,7 @@ const MarketPage: NextPage = () => {
       userAddress as `0x${string}`, 
       getHookAddress(chainId) as `0x${string}`
     ] : undefined,
+    chainId,
   });
 
   // Approve contract
@@ -595,7 +597,8 @@ const MarketPage: NextPage = () => {
   };
 
   const formattedCollateralNeeded = formatCollateralNeeded(collateralNeeded, collateralDecimals);
-
+  
+  
   // Log collateralNeeded to check its value
   useEffect(() => {
     console.log('Collateral Needed:', collateralNeeded);
@@ -755,8 +758,7 @@ const MarketPage: NextPage = () => {
         <div className={styles.rightPanel}>
           <div className={styles.tradingContainer}>
             <h2>Trade Shares</h2>
-                        
-
+            
             <div className={styles.tradeTypeSelector}>
               <button 
                 className={`${styles.tradeTypeButton} ${tradeType === 'buy' ? styles.active : ''}`}
