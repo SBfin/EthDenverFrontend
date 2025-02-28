@@ -116,7 +116,7 @@ export const useTokenValues = (
   });
 
   // Try the direct getTokenValues call (this might fail)
-  const { data, isLoading, error } = useReadContract({
+  const { data, isLoading, error, refetch } = useReadContract({
     address: viewHelperAddress as `0x${string}`,
     abi: ViewHelper,
     functionName: 'getTokenValues',
@@ -238,7 +238,14 @@ export const useTokenValues = (
     }
   }, [marketData, tokenSupplies]);
 
-  return values;
+  return {
+    yesValue: values.yesValue,
+    noValue: values.noValue,
+    probability: values.probability,
+    isLoading: values.isLoading,
+    error: values.error,
+    refetch
+  };
 };
 
 // Hook to get token supplies

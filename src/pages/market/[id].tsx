@@ -7,7 +7,7 @@ import { useMarket } from '../../hooks/useMarkets';
 import { useMarketActions } from '../../hooks/useMarketActions';
 import styles from '../../styles/MarketPage.module.css';
 import { formatEther, formatUnits } from 'viem';
-import { useAccount, useReadContract, useWriteContract, useChainId } from 'wagmi';
+import { useAccount, useReadContract, useWriteContract, useChainId, usePublicClient } from 'wagmi';
 import { parseEther, parseUnits } from 'viem';
 import { ERC20Abi } from '../../deployments/abis/ERC20';
 import { ViewHelper } from '../../deployments/abis/ViewHelper';
@@ -17,6 +17,8 @@ import { IMarketMakerHookAbi } from '../../deployments/abis/IMarketMakerHook';
 import { Market } from '../../types/market';
 import { useQuoteCollateral } from '../../hooks/useViewHelper';
 import { useWalrusMarketData } from '../../hooks/useWalrusMarketData';
+import { useTokenValues } from '../../hooks/useViewHelper';
+type TransactionStatus = 'idle' | 'waitingConfirmation' | 'waitingExecution' | 'success' | 'error';
 
 const MarketPage: NextPage = () => {
   const router = useRouter();
@@ -24,6 +26,7 @@ const MarketPage: NextPage = () => {
   const chainId = useChainId();
   const initialRender = useRef(true);
   const idRef = useRef(id);
+  const publicClient = usePublicClient();
   
   // Only log when id changes
   useEffect(() => {
@@ -41,6 +44,8 @@ const MarketPage: NextPage = () => {
   const [noAmount, setNoAmount] = useState('');
   const [needsApproval, setNeedsApproval] = useState(false);
   const [collateralNeeded, setCollateralNeeded] = useState<string>('0');
+  const [txStatus, setTxStatus] = useState<TransactionStatus>('idle');
+  const [txError, setTxError] = useState<string | null>(null);
 
   // Add this helper to get the correct hook address for the current chain
   const getHookAddress = (chainId: number) => {
@@ -224,12 +229,8 @@ const MarketPage: NextPage = () => {
 
   // Update handleApprove to include more logging
   const handleApprove = async () => {
-    if (!market?.hookAddress) {
-      console.error('No hook address available');
-      return;
-    }
-    
     try {
+      setTxStatus('waitingConfirmation');
       const { token: tokenToApprove, spender } = getTokenToApprove(
         chainId,
         market,
@@ -238,35 +239,26 @@ const MarketPage: NextPage = () => {
         noAmount
       );
 
-      const approvalAmount = tradeType === 'buy'
-        ? parseUnits('1000000', 6)
-        : parseEther('1000000');
-
-      console.log('Approval Request:', {
-        token: tokenToApprove,
-        spender,
-        amount: tradeType === 'buy' 
-          ? formatUnits(approvalAmount, 6)
-          : formatEther(approvalAmount),
-        tradeType
-      });
-
       const hash = await writeContractAsync({
         address: tokenToApprove as `0x${string}`,
         abi: ERC20Abi,
         functionName: 'approve',
-        args: [spender as `0x${string}`, approvalAmount],
+        args: [spender as `0x${string}`, parseEther('1000000')],
       });
 
-      console.log('Approval Transaction:', {
-        hash,
-        token: tokenToApprove,
-        spender,
-        amount: approvalAmount.toString()
-      });
+      setTxStatus('waitingExecution');
+      await publicClient?.waitForTransactionReceipt({ hash });
+      
+      setTxStatus('success');
+      setTimeout(() => setTxStatus('idle'), 500);
     } catch (error) {
       console.error('Approval Error:', error);
-      alert(`Error: ${(error as Error).message}`);
+      setTxStatus('error');
+      setTxError((error as Error).message);
+      setTimeout(() => {
+        setTxStatus('idle');
+        setTxError(null);
+      }, 500);
     }
   };
 
@@ -286,45 +278,34 @@ const MarketPage: NextPage = () => {
   }, [market, isLoading, error]);
 
   const handleTrade = async (outcome: 'YES' | 'NO') => {
-    const amount = outcome === 'YES' ? yesAmount : noAmount;
-    if (!amount || !market?.id) return;
-
-    console.log('🎯 handleTrade called:', { outcome, amount, marketId: market.id });
-
     try {
-      // Get the correct contract address based on chain
-      const contractAddresses = {
-        84532: addresses.baseSepolia.marketMakerHook,
-        1301: addresses.unichainSepolia.marketMakerHook
-      };
-
-      const hookAddress = contractAddresses[chainId as keyof typeof contractAddresses];
-      if (!hookAddress) {
-        throw new Error(`No hook address for chain ID ${chainId}`);
-      }
-
-      // Execute the swap using writeContractAsync
+      setTxStatus('waitingConfirmation');
+      const amount = outcome === 'YES' ? yesAmount : noAmount;
+      
       const hash = await executeSwap({
-        address: hookAddress as `0x${string}`,
+        address: getHookAddress(chainId) as `0x${string}`,
         abi: IMarketMakerHookAbi,
         functionName: 'executeSwap',
         args: [
-          market.id as `0x${string}`,
-          outcome === 'YES', // zeroForOne - true for YES
-          tradeType === 'sell' 
-            ? -parseEther(amount) // Negative for sells
-            : parseEther(amount), // Positive for buys
+          market?.id as `0x${string}`,
+          outcome === 'YES',
+          tradeType === 'sell' ? -parseEther(amount) : parseEther(amount),
         ],
       });
 
-      console.log('Transaction submitted:', hash);
-      alert('Transaction submitted! Please wait for confirmation.');
+      setTxStatus('waitingExecution');
+      await publicClient?.waitForTransactionReceipt({ hash });
       
-    } catch (error: any) {
-      console.error('Transaction failed:', error);
-      const revertReason = error.cause?.reason || error.message;
-      console.error('Revert reason:', revertReason);
-      alert(`Transaction failed: ${revertReason}`);
+      setTxStatus('success');
+      setTimeout(() => setTxStatus('idle'), 500);
+    } catch (error) {
+      console.error('Trade Error:', error);
+      setTxStatus('error');
+      setTxError((error as Error).message);
+      setTimeout(() => {
+        setTxStatus('idle');
+        setTxError(null);
+      }, 500);
     }
   };
 
@@ -608,25 +589,99 @@ const MarketPage: NextPage = () => {
     });
   }, [market?.id, tradeType, yesAmount, noAmount, chainId, quotedCollateral, quoteError]);
 
+  // Add the status component
+  const TransactionStatusOverlay = () => {
+    if (txStatus === 'idle') return null;
+
+    return (
+      <div className={styles.overlay}>
+        <div className={styles.statusBox}>
+          {txStatus === 'waitingConfirmation' && (
+            <>
+              <div className={styles.spinner} />
+              <p>Waiting for wallet confirmation...</p>
+            </>
+          )}
+          {txStatus === 'waitingExecution' && (
+            <>
+              <div className={styles.spinner} />
+              <p>Waiting for transaction to complete...</p>
+            </>
+          )}
+          {txStatus === 'success' && (
+            <>
+              <div className={styles.successIcon}>✓</div>
+              <p>Transaction successful!</p>
+            </>
+          )}
+          {txStatus === 'error' && (
+            <>
+              <div className={styles.errorIcon}>✗</div>
+              <p>{txError || 'Transaction failed'}</p>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // Add useTokenValues hook
+  const { 
+    yesValue, 
+    noValue, 
+    probability, 
+    isLoading: isProbabilityLoading,
+    refetch: refetchTokenValues 
+  } = useTokenValues(
+    market?.id,
+    market?.yesTokenAddress,
+    market?.noTokenAddress,
+    market?.collateralToken
+  );
+
+  // Format probability for display
+  const formattedProbability = probability ? 
+    `${(Number(probability) * 100).toFixed(1)}` : 
+    '50.0';
+
   return (
     <Layout title={market?.question || 'Loading Market...'}>
       <div className={styles.marketPage}>
         <div className={styles.leftPanel}>
           <div className={styles.chartContainer}>
-            <h2>Probability Chart</h2>
-            {/* Chart component will go here */}
+            <h2>Probability</h2>
+            <div className={styles.probabilityDisplay}>
+              {isProbabilityLoading ? (
+                <span className={styles.loading}>Loading...</span>
+              ) : (
+                <span className={styles.probabilityValue}>{formattedProbability}%</span>
+              )}
+            </div>
           </div>
-          
-          <div className={styles.transactionsContainer}>
-            <h2>Transactions</h2>
-            <div className={styles.transactionsList}>
-              {/* Example transaction list - replace with real data */}
-              <div className={styles.transaction}>
-                <span>Buy 100 YES shares</span>
-                <span>0.5 ETH</span>
-                <span>2 hours ago</span>
+
+          <div className={styles.marketDetailsContainer}>
+            <h2>Market Info</h2>
+            <div className={styles.detailsContent}>
+              <div className={styles.detailRow}>
+                <span className={styles.label}>Total Collateral:</span>
+                <span>{market?.collateralPoolSize || '0'} USDC</span>
               </div>
-              {/* Add more transactions */}
+              <div className={styles.detailRow}>
+                <span className={styles.label}>YES Value:</span>
+                <span>{yesValue || '0'} USDC</span>
+              </div>
+              <div className={styles.detailRow}>
+                <span className={styles.label}>NO Value:</span>
+                <span>{noValue || '0'} USDC</span>
+              </div>
+              <div className={styles.detailRow}>
+                <span className={styles.label}>Creator:</span>
+                <span>{market?.creator?.slice(0, 6)}...{market?.creator?.slice(-4)}</span>
+              </div>
+              <div className={styles.detailRow}>
+                <span className={styles.label}>Oracle:</span>
+                <span>{market?.oracleAddress?.slice(0, 6)}...{market?.oracleAddress?.slice(-4)}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -744,45 +799,6 @@ const MarketPage: NextPage = () => {
             </div>
           </div>
 
-          <div className={styles.marketDetailsContainer}>
-            <details className={styles.marketDetails}>
-              <summary>Market Details</summary>
-              <div className={styles.detailsContent}>
-                <div className={styles.detailRow}>
-                  <span>Question:</span>
-                  <span>{market?.question}</span>
-                </div>
-                <div className={styles.detailRow}>
-                  <span>Description:</span>
-                  <span>{market?.description}</span>
-                </div>
-                <div className={styles.detailRow}>
-                  <span>End Time:</span>
-                  <span>{new Date(market?.endTime || 0 * 1000).toLocaleString()}</span>
-                </div>
-                <div className={styles.detailRow}>
-                  <span>Collateral Pool:</span>
-                  <span>
-                    {market?.collateralPoolSize 
-                      ? market.collateralPoolSize
-                      : '0.0000'
-                    } USDC
-                  </span>
-                </div>
-                <div className={styles.detailRow}>
-                  <span>Status:</span>
-                  <span>{market?.resolved ? 'Resolved' : 'Active'}</span>
-                </div>
-                {market?.resolved && (
-                  <div className={styles.detailRow}>
-                    <span>Outcome:</span>
-                    <span>{market.outcome ? 'YES' : 'NO'}</span>
-                  </div>
-                )}
-              </div>
-            </details>
-          </div>
-
           {market?.resolved ? (
             <button className={styles.claimButton}>
               Claim Winnings
@@ -793,6 +809,7 @@ const MarketPage: NextPage = () => {
             </button>
           )}
         </div>
+        <TransactionStatusOverlay />
       </div>
     </Layout>
   );
