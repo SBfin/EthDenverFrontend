@@ -734,12 +734,12 @@ const MarketPage: NextPage = () => {
                 <span>{marketState ? formatUnits(marketState.totalCollateral, 6): '<0x>'} USDC</span>
               </div>
               <div className={styles.detailRow}>
-                <span className={styles.label}>YES Shares in the Pool:</span>
-                <span>{removeRightmostDigits(Number(yesValue).toFixed()) || '0'}</span>
+                <span className={styles.label}>Yes Share Value</span>
+                <span>{(Number(yesValue) / 1e12).toFixed(3) || '0.000'}</span>
               </div>
               <div className={styles.detailRow}>
-                <span className={styles.label}>NO Shares in the Pool:</span>
-                <span>{removeRightmostDigits(Number(noValue).toFixed()) || '0'}</span>
+                <span className={styles.label}>No ShareValue</span>
+                <span>{(Number(noValue) / 1e12).toFixed(3) || '0.000'}</span>
               </div>
               <div className={styles.detailRow}>
                 <span className={styles.label}>Creator:</span>
@@ -918,7 +918,7 @@ export default MarketPage;
 
 
 
-function removeRightmostDigits(number: string, digitsToRemove = 10) {
+function removeRightmostDigits(number: string, digitsToRemove = 9) {
   // Convert to string to get length
   const numberString = number.toString();
   
