@@ -6,10 +6,10 @@ const addresses = {
         "collateralToken": "0x4B5B734A133A4eB84fAc87750B00992260dA8096"
     },
     "unichainSepolia": {
-        "marketMakerHook": "0x41dea8aa63D66EAa757917C439e2dD9547458A80",
-        "viewHelper": "0x2817447562927BA3cFf71DDE4d9314474f88Afa1",
-        "uniHelper": "0x40dC4b21c67939884e531F98686f93E8E0f22b9d",
-        "collateralToken": "0xaBe537945c7447935AE5a53d3a4E3acfB5aC7Bc8"
+        "marketMakerHook": "0x14ab39C69fcC18A1CBA25D242A1fD9D609260A80",
+        "viewHelper": "0xc9F8FfdC0b4D4F9A305aE138eceD187895D08889",
+        "uniHelper": "0x3a32EEACD85398028E03F9b054752204e14ee79e",
+        "collateralToken": "0xe37f8Bc1FBFED3d4A619bf8947443f29425D58fC"
     }
 }
 export default addresses;
