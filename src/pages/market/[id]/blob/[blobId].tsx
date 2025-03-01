@@ -734,12 +734,12 @@ const MarketPage: NextPage = () => {
                 <span>{marketState ? formatUnits(marketState.totalCollateral, 6): '<0x>'} USDC</span>
               </div>
               <div className={styles.detailRow}>
-                <span className={styles.label}>Total YES Shares in the Pool:</span>
+              <span className={styles.label}>Yes Share Value</span>
                 <span>{(Number(yesValue) / 1e12).toFixed(3) || '0.000'}</span>
               </div>
               <div className={styles.detailRow}>
-                <span className={styles.label}>Total NO Shares in the Pool:</span>
-                <span>{(Number(noValue) / 1e12).toFixed(3) || '0.000'}</span>
+              <span className={styles.label}>No ShareValue</span>
+              <span>{(Number(noValue) / 1e12).toFixed(3) || '0.000'}</span>
               </div>
               <div className={styles.detailRow}>
                 <span className={styles.label}>Creator:</span>
