@@ -735,11 +735,11 @@ const MarketPage: NextPage = () => {
               </div>
               <div className={styles.detailRow}>
                 <span className={styles.label}>YES Shares in the Pool:</span>
-                <span>{yesValue || '0'}</span>
+                <span>{removeRightmostDigits(Number(yesValue).toFixed()) || '0'}</span>
               </div>
               <div className={styles.detailRow}>
                 <span className={styles.label}>NO Shares in the Pool:</span>
-                <span>{noValue || '0'}</span>
+                <span>{removeRightmostDigits(Number(noValue).toFixed()) || '0'}</span>
               </div>
               <div className={styles.detailRow}>
                 <span className={styles.label}>Creator:</span>
@@ -915,3 +915,24 @@ const MarketPage: NextPage = () => {
 };
 
 export default MarketPage; 
+
+
+
+function removeRightmostDigits(number: string, digitsToRemove = 10) {
+  // Convert to string to get length
+  const numberString = number.toString();
+  
+  // If the number has fewer digits than digitsToRemove, return 0
+  if (numberString.length <= digitsToRemove) {
+    return 0;
+  }
+  
+  // Calculate how many digits to keep
+  const digitsToKeep = numberString.length - digitsToRemove;
+  
+  // Get the leftmost digits
+  const leftmostDigits = numberString.substring(0, digitsToKeep);
+  
+  // Convert back to integer
+  return parseInt(leftmostDigits);
+}
