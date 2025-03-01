@@ -50,7 +50,7 @@ export const useMarketState = (marketId: string | undefined) => {
   });
 
   return {
-    marketState: marketState ? Number(marketState.state) : undefined,
+    marketState: marketState ? {...marketState, newstate: Number(marketState.state)} : undefined,
     isResolved: Number(marketState?.state) === MarketState.Resolved || Number(marketState?.state) === MarketState.Claimed,
     isClaimed: Number(marketState?.state) === MarketState.Claimed,
     refetchMarketState

@@ -731,7 +731,7 @@ const MarketPage: NextPage = () => {
             <div className={styles.detailsContent}>
               <div className={styles.detailRow}>
                 <span className={styles.label}>Total Collateral:</span>
-                <span>{market ? parseUnits(market.collateralPoolSize.toString(),6) : '0'} USDC</span>
+                <span>{marketState ? formatUnits(marketState.totalCollateral, 6): '<0x>'} USDC</span>
               </div>
               <div className={styles.detailRow}>
                 <span className={styles.label}>YES Value:</span>
@@ -872,9 +872,9 @@ const MarketPage: NextPage = () => {
                 <div className={styles.detailRow}>
                   <span className={styles.label}>Status:</span>
                   <span className={styles.statusValue}>
-                    {marketState === MarketState.Active ? 'Active' : 
-                     marketState === MarketState.Resolved ? 'Resolved' :
-                     marketState === MarketState.Claimed ? 'Claimed' : 'Unknown'}
+                    {marketState?.newstate === MarketState.Active ? 'Active' : 
+                     marketState?.newstate === MarketState.Resolved ? 'Resolved' :
+                     marketState?.newstate === MarketState.Claimed ? 'Claimed' : 'Unknown'}
                   </span>
                 </div>
                 {isResolved && (
@@ -888,18 +888,18 @@ const MarketPage: NextPage = () => {
               </div>
               
               <div className={styles.resolutionActions}>
-                {marketState === MarketState.Active && (
+                {marketState?.newstate === MarketState.Active && (
                   <button className={styles.resolveButton}>
                     Resolve Market
                   </button>
                 )}
                 
-                {(marketState === MarketState.Resolved || marketState === MarketState.Claimed) && (
+                {(marketState?.newstate === MarketState.Resolved || marketState?.newstate === MarketState.Claimed) && (
                   <button 
                     className={styles.claimButton}
                     onClick={handleClaim}
                   >
-                    {hasClaimed || marketState === MarketState.Claimed ? 'Already Claimed' : 
+                    {hasClaimed || marketState?.newstate === MarketState.Claimed ? 'Already Claimed' : 
                      isClaimPending ? 'Claiming...' : 
                      'Claim Winnings'}
                   </button>
