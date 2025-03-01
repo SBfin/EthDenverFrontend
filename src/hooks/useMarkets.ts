@@ -275,7 +275,7 @@ export const useMarket = (id: string | undefined) => {
   const chainId = useChainId();
   const contractAddress = getContractAddress(chainId) as `0x${string}`;
 
-    const blobId = process.env.NEXT_PUBLIC_BLOB_ID || '';
+    const blobId = process.env.NEXT_PUBLIC_BLOB_ID || 'xEoX8Wk1WQuQvbZnkME01lJOa4Q0r1CERj0zm4c1QEA';
     // if (blobId == '') throw 'blobId not added'
     const { data:walrusData, refetch}  = useWalrusMarketData(blobId, {
       onSuccess: (data) => {

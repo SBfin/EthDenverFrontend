@@ -11,7 +11,7 @@ const Home: NextPage = () => {
   const initialRender = useRef(true);
   // const [blobId, setBlobId] = useState('');
   // const [tempInputValue, setTempInputValue] = useState('');
-  const blobId = process.env.NEXT_PUBLIC_BLOB_ID || '';
+  const blobId = process.env.NEXT_PUBLIC_BLOB_ID || 'xEoX8Wk1WQuQvbZnkME01lJOa4Q0r1CERj0zm4c1QEA';
   const { data:walrusData, refetch}  = useWalrusMarketData(blobId, {
     onSuccess: (data) => {
       console.log('Successfully fetched market data:', blobId, data);
