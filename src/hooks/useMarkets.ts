@@ -267,7 +267,7 @@ export const useAllMarkets = () => {
   return { markets, isLoading: isLoadingState, error };
 };
 
-export const useMarket = (id: string | undefined) => {
+export const useMarket = (id: string | undefined, blobId?: string) => {
   const [market, setMarket] = useState<Market | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -275,9 +275,9 @@ export const useMarket = (id: string | undefined) => {
   const chainId = useChainId();
   const contractAddress = getContractAddress(chainId) as `0x${string}`;
 
-    const blobId = process.env.NEXT_PUBLIC_BLOB_ID || '_dCjuEy9C8-_xNAZ07e4R1izs0DoCOxVg_SWpXSNQWY';
-    // if (blobId == '') throw 'blobId not added'
-    const { data:walrusData, refetch}  = useWalrusMarketData(blobId, {
+    // const blobId = process.env.NEXT_PUBLIC_BLOB_ID || '_dCjuEy9C8-_xNAZ07e4R1izs0DoCOxVg_SWpXSNQWY';
+    const _blobId = blobId ? blobId : process.env.NEXT_PUBLIC_BLOB_ID || '_dCjuEy9C8-_xNAZ07e4R1izs0DoCOxVg_SWpXSNQWY'
+    const { data:walrusData, refetch}  = useWalrusMarketData(_blobId, {
       onSuccess: (data) => {
         console.log('Successfully fetched market data:', blobId, data);
       },
