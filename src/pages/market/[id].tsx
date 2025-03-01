@@ -734,12 +734,12 @@ const MarketPage: NextPage = () => {
                 <span>{marketState ? formatUnits(marketState.totalCollateral, 6): '<0x>'} USDC</span>
               </div>
               <div className={styles.detailRow}>
-                <span className={styles.label}>YES Value:</span>
-                <span>{yesValue || '0'} USDC</span>
+                <span className={styles.label}>YES Shares in the Pool:</span>
+                <span>{yesValue || '0'}</span>
               </div>
               <div className={styles.detailRow}>
-                <span className={styles.label}>NO Value:</span>
-                <span>{noValue || '0'} USDC</span>
+                <span className={styles.label}>NO Shares in the Pool:</span>
+                <span>{noValue || '0'}</span>
               </div>
               <div className={styles.detailRow}>
                 <span className={styles.label}>Creator:</span>
@@ -832,8 +832,8 @@ const MarketPage: NextPage = () => {
                   <div className={styles.collateralInfo}>
                     <div className={styles.collateralNeeded}>
                       {Number(collateralNeeded) >= 0 
-                        ? `Collateral needed: ${collateralNeeded} USDC`
-                        : `Collateral received: ${Math.abs(Number(collateralNeeded)).toFixed(4)} USDC`
+                        ? `Collateral needed: ${collateralNeeded}`
+                        : `Collateral received: ${Math.abs(Number(collateralNeeded)).toFixed(4)}`
                       }
                     </div>
                     <div className={styles.collateralBalance}>
