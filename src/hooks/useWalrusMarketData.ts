@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { getMarketData } from '../lib/walrus'; // Update this path to match your project structure
 
 interface WalrusMarketData {
@@ -32,39 +32,61 @@ export function useWalrusMarketData(
   const [data, setData] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<Error | null>(null);
+  
+  // Use refs to store the latest callback values without triggering re-renders
+  const onSuccessRef = useRef(onSuccess);
+  const onErrorRef = useRef(onError);
+  
+  // Update refs when callbacks change
+  useEffect(() => {
+    onSuccessRef.current = onSuccess;
+    onErrorRef.current = onError;
+  }, [onSuccess, onError]);
 
+  // Store blobId in a ref to access latest value without dependency
+  const blobIdRef = useRef(blobId);
+  useEffect(() => {
+    blobIdRef.current = blobId;
+  }, [blobId]);
+
+  // Define fetchData outside of any effects
   const fetchData = async () => {
-    if (!blobId) return;
+    if (!blobIdRef.current) return;
     
     setIsLoading(true);
     setError(null);
     
     try {
-      const result = await getMarketData(blobId);
+      const result = await getMarketData(blobIdRef.current);
       setData(result);
-      if (onSuccess) onSuccess(result);
+      if (onSuccessRef.current) onSuccessRef.current(result);
     } catch (err) {
       const errorObj = err instanceof Error ? err : new Error(String(err));
       setError(errorObj);
-      if (onError) onError(errorObj);
+      if (onErrorRef.current) onErrorRef.current(errorObj);
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Create a stable refetch function
+  const refetchRef = useRef(fetchData);
+  
+  // Use a stable effect that doesn't depend on functions
   useEffect(() => {
+    // Only fetch when enabled changes to true or when blobId changes while enabled
     if (enabled) {
       fetchData();
     }
-  }, [blobId, enabled, fetchData]);
+  }, [blobId, enabled]); // Only depend on primitive values
 
-  const refetch = async () => {
-    await fetchData();
+  return { 
+    data, 
+    isLoading, 
+    error, 
+    refetch: fetchData  // Using the same function instance
   };
-
-  return { data, isLoading, error, refetch };
 }
-
 
 /**
  * Example usage

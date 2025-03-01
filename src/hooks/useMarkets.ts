@@ -352,7 +352,6 @@ export const useMarket = (id: string | undefined) => {
         oracleAddress: marketData.oracle || "Not available",
       };
 
-      console.log('walrusdata', walrusData)
       if (walrusData) {
         // Your data change logic here
         for (const x of walrusData) {

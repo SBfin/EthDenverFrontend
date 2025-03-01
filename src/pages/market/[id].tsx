@@ -731,7 +731,7 @@ const MarketPage: NextPage = () => {
             <div className={styles.detailsContent}>
               <div className={styles.detailRow}>
                 <span className={styles.label}>Total Collateral:</span>
-                <span>{market?.collateralPoolSize || '0'} USDC</span>
+                <span>{market ? parseUnits(market.collateralPoolSize.toString(),6) : '0'} USDC</span>
               </div>
               <div className={styles.detailRow}>
                 <span className={styles.label}>YES Value:</span>
