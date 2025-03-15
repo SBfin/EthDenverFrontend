@@ -20,6 +20,21 @@ import { useTokenValues } from '../../../../hooks/useViewHelper';
 import { useClaim } from '../../../../hooks/useClaim';
 import { useMarketState, MarketState } from '../../../../hooks/useMarketState';
 type TransactionStatus = 'idle' | 'waitingConfirmation' | 'waitingExecution' | 'success' | 'error';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+
+
+export interface MarketStateChart {
+  yesSupply: number;
+  noSupply: number;
+  yesPrice: number;
+  noPrice: number;
+  collateralPool: number;
+  priceHistory: Array<{
+    time: string;
+    yesPrice: number;
+    noPrice: number;
+  }>;
+}
 
 const MarketPage: NextPage = () => {
   const router = useRouter();
@@ -48,6 +63,20 @@ const MarketPage: NextPage = () => {
   const [collateralNeeded, setCollateralNeeded] = useState<string>('0');
   const [txStatus, setTxStatus] = useState<TransactionStatus>('idle');
   const [txError, setTxError] = useState<string | null>(null);
+  const [marketStateChart, setMarketStateChart] = useState<MarketStateChart>({
+    yesSupply: 1000,
+    noSupply: 1000,
+    yesPrice: 0.5,
+    noPrice: 0.5,
+    collateralPool: 0,
+    priceHistory: [
+      { time: '0', yesPrice: 0.5, noPrice: 0.5 },
+      { time: '1', yesPrice: 0.4, noPrice: 0.6 },
+      { time: '2', yesPrice: 0.5, noPrice: 0.5 },
+      { time: '3', yesPrice: 0.4, noPrice: 0.6 },
+      { time: '4', yesPrice: 0.3, noPrice: 0.7 },
+    ]
+  });
 
   // Add this helper to get the correct hook address for the current chain
   const getHookAddress = (chainId: number) => {
@@ -721,7 +750,36 @@ const MarketPage: NextPage = () => {
               {isProbabilityLoading ? (
                 <span className={styles.loading}>Loading...</span>
               ) : (
-                <span className={styles.probabilityValue}>{formattedProbability}%</span>
+                // <span className={styles.probabilityValue}>{formattedProbability}%  fff</span>
+                <div className={styles.chartWrapper} style={{ width: '100%', height: '300px' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={marketStateChart.priceHistory}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="time" />
+                    <YAxis domain={[0, 1]} tickFormatter={(value) => `${(value * 100).toFixed(0)}%`} />
+                    <Tooltip formatter={(value: any) => `${(value * 100).toFixed(1)}%`} />
+                    <Legend />
+                    <Line 
+                      type="monotone" 
+                      dataKey="yesPrice" 
+                      stroke="#82ca9d" 
+                      name="YES Token" 
+                      strokeWidth={2}
+                      dot={{ r: 4 }}
+                      activeDot={{ r: 6 }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="noPrice" 
+                      stroke="#8884d8" 
+                      name="NO Token"
+                      strokeWidth={2}
+                      dot={{ r: 4 }}
+                      activeDot={{ r: 6 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
               )}
             </div>
           </div>
